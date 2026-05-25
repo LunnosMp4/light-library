@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  photo-stream:
+    build: .
+    ports:
+      - "5500:5500"
+    environment:
+      PORT: 5500
+      ADMIN_USER: admin
+      ADMIN_PASS: change-me
+      SESSION_SECRET: change-me-now
+      THUMB_WIDTH: 1000
+      THUMB_QUALITY: 70
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+    restart: unless-stopped

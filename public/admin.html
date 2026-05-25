@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Photo Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="admin-body">
+    <div class="noise-background" aria-hidden="true"></div>
+
+    <main class="admin-shell">
+      <section class="panel">
+        <div class="panel-title">Admin</div>
+
+        <div id="login-panel">
+          <h1>Sign in</h1>
+          <form id="login-form" class="stack">
+            <label class="field">
+              <span>Username</span>
+              <input type="text" name="username" autocomplete="username" required />
+            </label>
+            <label class="field">
+              <span>Password</span>
+              <input
+                type="password"
+                name="password"
+                autocomplete="current-password"
+                required
+              />
+            </label>
+            <button class="primary" type="submit">Login</button>
+          </form>
+          <div id="login-status" class="status"></div>
+        </div>
+
+        <div id="upload-panel" class="hidden">
+          <h1>Upload</h1>
+          <form id="upload-form" class="stack">
+            <label class="field">
+              <span>Select images</span>
+              <input
+                type="file"
+                name="photos"
+                multiple
+                accept="image/jpeg,image/png,image/heic,image/heif"
+                required
+              />
+            </label>
+            <button class="primary" type="submit">Upload</button>
+            <button id="logout" class="ghost" type="button">Logout</button>
+          </form>
+          <div class="progress">
+            <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+          </div>
+          <div id="upload-status" class="status"></div>
+        </div>
+      </section>
+
+      <section id="gallery-panel" class="panel hidden">
+        <div class="panel-title">Library</div>
+        <div id="admin-gallery" class="admin-gallery"></div>
+      </section>
+    </main>
+
+    <script src="/admin.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Photo Stream</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="noise-background" aria-hidden="true"></div>
+
+    <main class="gallery">
+      <div id="grid" class="grid" aria-live="polite"></div>
+      <div id="empty" class="empty hidden">No photos yet. Upload the first set.</div>
+    </main>
+
+    <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true">
+      <button id="lightbox-close" class="lightbox-close" aria-label="Close">
+        Close
+      </button>
+      <img id="lightbox-image" alt="Full size" />
+    </div>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
