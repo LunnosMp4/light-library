@@ -10,8 +10,8 @@ services:
       ADMIN_USER: admin
       ADMIN_PASS: change-me
       SESSION_SECRET: change-me-now
-      THUMB_WIDTH: 1000
-      THUMB_QUALITY: 70
+      THUMB_WIDTH: 1200
+      THUMB_QUALITY: 85
     volumes:
       - ./uploads:/app/uploads
       - ./data:/app/data

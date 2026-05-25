@@ -59,7 +59,7 @@ function layoutGrid() {
     item.style.gridColumnEnd = `span ${spanCols}`;
 
     const itemWidth = columnWidth * spanCols + gap * (spanCols - 1);
-    const itemHeight = Math.round(itemWidth * (height / width));
+    const itemHeight = Math.round(itemWidth);
     const rowSpan = Math.max(1, Math.ceil((itemHeight + gap) / (rowHeight + gap)));
 
     item.style.gridRowEnd = `span ${rowSpan}`;

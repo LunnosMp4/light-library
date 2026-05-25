@@ -8,6 +8,12 @@ const logoutButton = document.getElementById("logout");
 const progressBar = document.getElementById("progress-bar");
 const galleryPanel = document.getElementById("gallery-panel");
 const adminGallery = document.getElementById("admin-gallery");
+const storageBox = document.getElementById("storage");
+
+function formatGB(bytes) {
+  const gb = bytes / (1024 ** 3);
+  return `${gb.toFixed(2)} GB`;
+}
 
 async function login(username, password) {
   const response = await fetch("/admin/login", {
@@ -78,6 +84,33 @@ async function deletePhoto(id) {
   }
 }
 
+async function loadStorage() {
+  if (!storageBox) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/admin/storage", { credentials: "include" });
+    if (!response.ok) {
+      throw new Error("Storage unavailable");
+    }
+
+    const payload = await response.json();
+    const used = Number(payload.usedBytes) || 0;
+    const total = Number(payload.totalBytes) || 0;
+    const free = Number(payload.freeBytes) || 0;
+
+    storageBox.innerHTML = `
+      <div>Storage used: ${formatGB(used)} / ${formatGB(total)}</div>
+      <small>Free space: ${formatGB(free)}</small>
+    `;
+    storageBox.classList.remove("hidden");
+  } catch (error) {
+    storageBox.classList.add("hidden");
+    storageBox.textContent = "";
+  }
+}
+
 function renderGallery(images) {
   adminGallery.innerHTML = "";
 
@@ -110,6 +143,7 @@ function renderGallery(images) {
       try {
         await deletePhoto(image.id);
         await loadGallery();
+        await loadStorage();
       } catch (error) {
         uploadStatus.textContent = error.message;
       }
@@ -146,6 +180,7 @@ loginForm.addEventListener("submit", async (event) => {
     uploadStatus.textContent = "";
     setProgress(0);
     await loadGallery();
+    await loadStorage();
   } catch (error) {
     loginStatus.textContent = error.message;
   }
@@ -181,6 +216,7 @@ uploadForm.addEventListener("submit", async (event) => {
     uploadStatus.textContent = "Upload complete.";
     uploadForm.reset();
     await loadGallery();
+    await loadStorage();
   } catch (error) {
     uploadStatus.textContent = error.message;
   }
@@ -203,6 +239,9 @@ checkSession()
       loginPanel.classList.add("hidden");
       uploadPanel.classList.remove("hidden");
       loadGallery().catch(() => {
+        void 0;
+      });
+      loadStorage().catch(() => {
         void 0;
       });
     }

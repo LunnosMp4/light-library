@@ -4,6 +4,7 @@ const express = require("express");
 const session = require("express-session");
 const multer = require("multer");
 const sharp = require("sharp");
+const checkDiskSpace = require("check-disk-space").default;
 const { nanoid } = require("nanoid");
 
 const app = express();
@@ -12,8 +13,8 @@ const PORT = Number(process.env.PORT || 3000);
 const ADMIN_USER = process.env.ADMIN_USER || "admin";
 const ADMIN_PASS = process.env.ADMIN_PASS || "changeme";
 const SESSION_SECRET = process.env.SESSION_SECRET || "change-me";
-const THUMB_WIDTH = Number(process.env.THUMB_WIDTH || 600);
-const THUMB_QUALITY = Number(process.env.THUMB_QUALITY || 70);
+const THUMB_SIZE = Number(process.env.THUMB_SIZE || 1200);
+const THUMB_QUALITY = Number(process.env.THUMB_QUALITY || 85);
 
 const DATA_DIR = path.join(__dirname, "data");
 const UPLOAD_DIR = path.join(__dirname, "uploads");
@@ -143,6 +144,16 @@ app.get("/admin/session", (req, res) => {
   res.json({ ok: true, isAdmin: Boolean(req.session && req.session.isAdmin) });
 });
 
+app.get("/admin/storage", requireAdmin, async (req, res, next) => {
+  try {
+    const { free, size } = await checkDiskSpace(UPLOAD_DIR);
+    const used = Math.max(0, size - free);
+    res.json({ ok: true, totalBytes: size, freeBytes: free, usedBytes: used });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/admin/login", (req, res) => {
   const { username, password } = req.body || {};
 
@@ -180,7 +191,12 @@ app.post("/admin/upload", requireAdmin, upload.single("photo"), async (req, res,
       const metadata = await sharp(file.path).metadata();
       await sharp(file.path)
         .rotate()
-        .resize({ width: THUMB_WIDTH })
+        .resize({
+          width: THUMB_SIZE,
+          height: THUMB_SIZE,
+          fit: "cover",
+          position: "entropy"
+        })
         .webp({ quality: THUMB_QUALITY })
         .toFile(thumbPath);
 
