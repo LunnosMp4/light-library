@@ -4,26 +4,7 @@ const lightbox = document.getElementById("lightbox");
 const lightboxImage = document.getElementById("lightbox-image");
 const lightboxClose = document.getElementById("lightbox-close");
 
-const observer = new IntersectionObserver(
-  (entries, obs) => {
-    entries.forEach((entry) => {
-      if (!entry.isIntersecting) {
-        return;
-      }
-
-      const img = entry.target;
-      const src = img.dataset.src;
-
-      if (src) {
-        img.src = src;
-        img.removeAttribute("data-src");
-      }
-
-      obs.unobserve(img);
-    });
-  },
-  { rootMargin: "300px" }
-);
+let hasLoaded = false;
 
 function openLightbox(src) {
   lightboxImage.src = src;
@@ -49,6 +30,13 @@ document.addEventListener("keydown", (event) => {
 });
 
 async function loadImages() {
+  if (hasLoaded) {
+    return;
+  }
+  hasLoaded = true;
+
+  grid.innerHTML = "";
+
   const response = await fetch("/images");
   const images = await response.json();
 
@@ -67,8 +55,9 @@ async function loadImages() {
 
     const img = document.createElement("img");
     img.alt = "Photo";
-    img.loading = "lazy";
     img.decoding = "async";
+    img.src = image.thumb;
+    img.dataset.full = image.original;
 
     const width = Number(image.width) || 0;
     const height = Number(image.height) || 0;
@@ -77,10 +66,7 @@ async function loadImages() {
       img.height = height;
     }
 
-    img.dataset.src = image.thumb;
-    img.dataset.full = image.original;
-
-    if (img.complete) {
+    if (img.complete && img.naturalWidth > 0) {
       img.classList.add("loaded");
     } else {
       img.addEventListener("load", () => img.classList.add("loaded"), {
@@ -92,7 +78,6 @@ async function loadImages() {
       openLightbox(img.dataset.full);
     });
 
-    observer.observe(img);
     item.appendChild(img);
     fragment.appendChild(item);
   });
@@ -100,7 +85,9 @@ async function loadImages() {
   grid.appendChild(fragment);
 }
 
-loadImages().catch(() => {
-  empty.textContent = "Failed to load images.";
-  empty.classList.remove("hidden");
+document.addEventListener("DOMContentLoaded", () => {
+  loadImages().catch(() => {
+    empty.textContent = "Failed to load images.";
+    empty.classList.remove("hidden");
+  });
 });

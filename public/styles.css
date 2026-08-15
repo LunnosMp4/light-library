@@ -58,6 +58,8 @@ body {
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--card);
+  position: relative;
+  transform: translateZ(0);
 }
 
 .masonry-item img {
@@ -65,10 +67,30 @@ body {
   height: auto;
   display: block;
   opacity: 0;
-  transition: opacity 0.4s ease;
+  transform: translateZ(0);
+  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
 }
 
 .masonry-item img.loaded {
+  opacity: 1;
+}
+
+.masonry-item:hover img.loaded {
+  transform: scale(1.04);
+  opacity: 0.9;
+}
+
+.masonry-item::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.05);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.masonry-item:hover::after {
   opacity: 1;
 }
 
