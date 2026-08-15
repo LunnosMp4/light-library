@@ -194,8 +194,8 @@ app.post("/admin/upload", requireAdmin, upload.single("photo"), async (req, res,
         .resize({
           width: THUMB_SIZE,
           height: THUMB_SIZE,
-          fit: "cover",
-          position: "entropy"
+          fit: "inside",
+          withoutEnlargement: true
         })
         .webp({ quality: THUMB_QUALITY })
         .toFile(thumbPath);

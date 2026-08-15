@@ -4,9 +4,6 @@ const lightbox = document.getElementById("lightbox");
 const lightboxImage = document.getElementById("lightbox-image");
 const lightboxClose = document.getElementById("lightbox-close");
 
-const placeholderSrc =
-  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-
 const observer = new IntersectionObserver(
   (entries, obs) => {
     entries.forEach((entry) => {
@@ -27,49 +24,6 @@ const observer = new IntersectionObserver(
   },
   { rootMargin: "300px" }
 );
-
-function getGridMetrics() {
-  const styles = getComputedStyle(grid);
-  const rowHeight = parseInt(styles.getPropertyValue("grid-auto-rows"), 10) || 10;
-  const gap = parseInt(styles.getPropertyValue("gap"), 10) || 0;
-  return { rowHeight, gap };
-}
-
-function layoutGrid() {
-  const items = Array.from(grid.children);
-  if (items.length === 0) {
-    return;
-  }
-
-  const first = items[0];
-  const columnWidth = first.getBoundingClientRect().width;
-  if (!columnWidth) {
-    return;
-  }
-
-  const { rowHeight, gap } = getGridMetrics();
-  const maxCols = Math.max(1, Math.floor((grid.clientWidth + gap) / (columnWidth + gap)));
-
-  items.forEach((item) => {
-    const width = Number(item.dataset.width) || 1;
-    const height = Number(item.dataset.height) || 1;
-    let spanCols = Number(item.dataset.span) || 1;
-    spanCols = Math.min(spanCols, maxCols);
-
-    item.style.gridColumnEnd = `span ${spanCols}`;
-
-    const itemWidth = columnWidth * spanCols + gap * (spanCols - 1);
-    const itemHeight = Math.round(itemWidth);
-    const rowSpan = Math.max(1, Math.ceil((itemHeight + gap) / (rowHeight + gap)));
-
-    item.style.gridRowEnd = `span ${rowSpan}`;
-  });
-}
-
-const resizeObserver = new ResizeObserver(() => {
-  layoutGrid();
-});
-resizeObserver.observe(grid);
 
 function openLightbox(src) {
   lightboxImage.src = src;
@@ -105,29 +59,34 @@ async function loadImages() {
 
   empty.classList.add("hidden");
 
+  const fragment = document.createDocumentFragment();
+
   images.forEach((image) => {
     const item = document.createElement("article");
-    item.className = "grid-item";
-
-    const width = image.width || 1;
-    const height = image.height || 1;
-    const aspectRatio = width / height;
-    let spanCols = 1;
-
-    if (aspectRatio > 1.25) {
-      spanCols = 2;
-    }
-
-    item.dataset.width = String(width);
-    item.dataset.height = String(height);
-    item.dataset.span = String(spanCols);
+    item.className = "masonry-item";
 
     const img = document.createElement("img");
     img.alt = "Photo";
     img.loading = "lazy";
-    img.src = placeholderSrc;
+    img.decoding = "async";
+
+    const width = Number(image.width) || 0;
+    const height = Number(image.height) || 0;
+    if (width > 0 && height > 0) {
+      img.width = width;
+      img.height = height;
+    }
+
     img.dataset.src = image.thumb;
     img.dataset.full = image.original;
+
+    if (img.complete) {
+      img.classList.add("loaded");
+    } else {
+      img.addEventListener("load", () => img.classList.add("loaded"), {
+        once: true
+      });
+    }
 
     img.addEventListener("click", () => {
       openLightbox(img.dataset.full);
@@ -135,11 +94,10 @@ async function loadImages() {
 
     observer.observe(img);
     item.appendChild(img);
-
-    grid.appendChild(item);
+    fragment.appendChild(item);
   });
 
-  requestAnimationFrame(layoutGrid);
+  grid.appendChild(fragment);
 }
 
 loadImages().catch(() => {
