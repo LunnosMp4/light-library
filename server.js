@@ -267,9 +267,6 @@ app.get("/images", async (req, res) => {
 
 app.get("/albums", async (req, res) => {
   const albums = await readAlbums();
-  albums.sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-  );
   res.json(albums);
 });
 
@@ -300,10 +297,38 @@ app.post("/admin/albums", requireAdmin, async (req, res, next) => {
       createdAt: new Date().toISOString()
     };
 
-    albums.push(album);
+    albums.unshift(album);
     await saveAlbums(albums);
 
     res.json({ ok: true, album });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/admin/albums/reorder", requireAdmin, async (req, res, next) => {
+  try {
+    const order = Array.isArray(req.body && req.body.order)
+      ? req.body.order.map((id) => String(id))
+      : null;
+
+    if (!order) {
+      res.status(400).json({ ok: false, message: "Order array is required" });
+      return;
+    }
+
+    const albums = await readAlbums();
+    const byId = new Map(albums.map((album) => [album.id, album]));
+
+    const ordered = order.map((id) => byId.get(id)).filter(Boolean);
+
+    const included = new Set(ordered.map((album) => album.id));
+    const extras = albums.filter((album) => !included.has(album.id));
+
+    const result = ordered.concat(extras);
+    await saveAlbums(result);
+
+    res.json({ ok: true, albums: result });
   } catch (error) {
     next(error);
   }

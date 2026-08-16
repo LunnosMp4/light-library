@@ -43,6 +43,7 @@ let selectedIds = new Set();
 let libraryImages = [];
 let currentFilter = null;
 let editingImage = null;
+let albumSortable = null;
 
 function formatGB(bytes) {
   const gb = bytes / 1024 ** 3;
@@ -87,7 +88,7 @@ async function apiJson(url, options = {}) {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(payload.message || "Request failed");
+    throw new Error(payload.message || `Request failed (${response.status})`);
   }
 
   return payload;
@@ -238,12 +239,23 @@ function renderAlbumList() {
   });
   albumList.appendChild(allButton);
 
+  const sortable = document.createElement("div");
+  sortable.id = "album-sortable";
+  sortable.className = "album-sortable";
+
   albums.forEach((album) => {
     const item = document.createElement("div");
     item.className =
       "album-item" + (currentFilter === album.slug ? " active" : "");
+    item.dataset.id = album.id;
     item.setAttribute("role", "button");
     item.tabIndex = 0;
+
+    const drag = document.createElement("span");
+    drag.className = "album-drag";
+    drag.setAttribute("aria-hidden", "true");
+    drag.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>';
 
     const label = document.createElement("span");
     label.className = "album-label";
@@ -285,7 +297,12 @@ function renderAlbumList() {
       switchView("library");
     };
 
-    item.addEventListener("click", openAlbum);
+    item.addEventListener("click", (event) => {
+      if (event.target.closest(".album-drag")) {
+        return;
+      }
+      openAlbum();
+    });
     item.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
@@ -293,9 +310,58 @@ function renderAlbumList() {
       }
     });
 
-    item.append(label, count, actions);
-    albumList.appendChild(item);
+    item.append(drag, label, count, actions);
+    sortable.appendChild(item);
   });
+
+  albumList.appendChild(sortable);
+
+  initAlbumSortable();
+}
+
+function initAlbumSortable() {
+  if (albumSortable) {
+    albumSortable.destroy();
+    albumSortable = null;
+  }
+
+  const container = document.getElementById("album-sortable");
+  if (!container || typeof Sortable === "undefined") {
+    return;
+  }
+
+  albumSortable = new Sortable(container, {
+    animation: 150,
+    handle: ".album-drag",
+    ghostClass: "sortable-ghost",
+    onEnd: onAlbumReorder
+  });
+}
+
+async function onAlbumReorder() {
+  const container = document.getElementById("album-sortable");
+  if (!container) {
+    return;
+  }
+
+  const order = Array.from(container.children)
+    .map((el) => el.dataset.id)
+    .filter(Boolean);
+
+  try {
+    const payload = await apiJson("/admin/albums/reorder", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order })
+    });
+
+    if (Array.isArray(payload.albums)) {
+      albums = payload.albums;
+    }
+  } catch (error) {
+    albumStatus.textContent = error.message;
+    await loadAlbums();
+  }
 }
 
 async function renameAlbum(album) {

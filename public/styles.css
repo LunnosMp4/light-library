@@ -445,7 +445,7 @@ input[type="file"] {
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 320px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -460,12 +460,24 @@ input[type="file"] {
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   font-weight: 600;
   font-size: 1.1rem;
   letter-spacing: 0.02em;
+}
+
+.brand-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--ink);
 }
 
 .nav {
@@ -557,6 +569,36 @@ input[type="file"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.album-sortable {
+  display: grid;
+  gap: 4px;
+}
+
+.album-drag {
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  opacity: 0.35;
+  cursor: grab;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+}
+
+.album-item:hover .album-drag {
+  opacity: 0.8;
+}
+
+.album-drag svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.sortable-ghost {
+  opacity: 0.5;
+  background: rgba(17, 17, 17, 0.06);
 }
 
 .album-actions {
