@@ -151,9 +151,14 @@ function buildImageItem(image) {
   if (img.complete && img.naturalWidth > 0) {
     img.classList.add("loaded");
   } else {
-    img.addEventListener("load", () => img.classList.add("loaded"), {
-      once: true
-    });
+    img.addEventListener(
+      "load",
+      () => {
+        img.classList.add("loaded");
+        scheduleLayout();
+      },
+      { once: true }
+    );
   }
 
   img.addEventListener("click", () => {
@@ -171,6 +176,20 @@ function buildImageItem(image) {
 function gridGap() {
   const gap = parseFloat(getComputedStyle(grid).getPropertyValue("--gap"));
   return Number.isFinite(gap) ? gap : 16;
+}
+
+function imageDimensions(image, img) {
+  if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
+    return { width: img.naturalWidth, height: img.naturalHeight };
+  }
+
+  const width = Number(image.width) || 0;
+  const height = Number(image.height) || 0;
+  if (width > 0 && height > 0) {
+    return { width, height };
+  }
+
+  return { width: 0, height: 0 };
 }
 
 function renderImages(images) {
@@ -223,8 +242,8 @@ function layoutMasonry() {
       return;
     }
 
-    const width = Number(image.width) || 0;
-    const height = Number(image.height) || 0;
+    const img = item.querySelector("img");
+    const { width, height } = imageDimensions(image, img);
     const span = image.isFeatured ? 2 : 1;
     const itemWidth = span * columnWidth + (span - 1) * gap;
     const renderedHeight =
@@ -484,18 +503,20 @@ albumNav.addEventListener(
   { passive: false }
 );
 
-let resizeFrame = null;
+let layoutFrame = null;
 
-window.addEventListener("resize", () => {
-  if (resizeFrame) {
+function scheduleLayout() {
+  if (layoutFrame) {
     return;
   }
 
-  resizeFrame = requestAnimationFrame(() => {
-    resizeFrame = null;
+  layoutFrame = requestAnimationFrame(() => {
+    layoutFrame = null;
     layoutMasonry();
   });
-});
+}
+
+window.addEventListener("resize", scheduleLayout);
 
 document.addEventListener("DOMContentLoaded", async () => {
   let albums = [];
