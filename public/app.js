@@ -87,13 +87,12 @@ function renderImages(images) {
   grid.appendChild(fragment);
 }
 
-async function loadImages(slug) {
+async function fetchImages(slug) {
   const url = slug
     ? `/images?album=${encodeURIComponent(slug)}`
     : "/images";
   const response = await fetch(url);
-  const images = await response.json();
-  renderImages(images);
+  return response.json();
 }
 
 function setActive(slug) {
@@ -134,24 +133,112 @@ function renderNav(albums) {
   });
 }
 
+const EXIT_DURATION = 350;
+const ENTER_DURATION = 600;
+const STAGGER_STEP = 25;
+const STAGGER_MAX = 300;
+
+let switchToken = 0;
+
+function animateExit(items) {
+  if (!items.length) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (!settled) {
+        settled = true;
+        resolve();
+      }
+    };
+    const timer = setTimeout(finish, EXIT_DURATION + 60);
+
+    let pending = items.length;
+    items.forEach((item) => {
+      const onEnd = (event) => {
+        if (event.target !== item || event.propertyName !== "transform") {
+          return;
+        }
+        item.removeEventListener("transitionend", onEnd);
+        pending -= 1;
+        if (pending <= 0) {
+          clearTimeout(timer);
+          finish();
+        }
+      };
+      item.addEventListener("transitionend", onEnd);
+      item.classList.add("album-exit");
+    });
+  });
+}
+
+function enterItems(items) {
+  if (!items.length) {
+    return;
+  }
+
+  items.forEach((item, index) => {
+    item.style.setProperty(
+      "--delay",
+      `${Math.min(index * STAGGER_STEP, STAGGER_MAX)}ms`
+    );
+    item.classList.add("album-enter");
+  });
+
+  const maxDelay = Math.min((items.length - 1) * STAGGER_STEP, STAGGER_MAX);
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      items.forEach((item) => {
+        item.classList.remove("album-enter");
+        item.classList.add("album-enter-active");
+      });
+
+      window.setTimeout(() => {
+        items.forEach((item) => {
+          item.classList.remove("album-enter-active");
+          item.style.removeProperty("--delay");
+        });
+      }, maxDelay + ENTER_DURATION + 60);
+    });
+  });
+}
+
 async function switchAlbum(slug) {
   if (slug === currentSlug) {
     return;
   }
 
+  const token = ++switchToken;
   currentSlug = slug;
   setActive(slug);
 
-  grid.classList.add("is-fading");
-
-  try {
-    await loadImages(slug);
-  } catch (error) {
-    empty.textContent = "Failed to load images.";
-    empty.classList.remove("hidden");
+  const items = Array.from(grid.querySelectorAll(".masonry-item"));
+  await animateExit(items);
+  if (token !== switchToken) {
+    return;
   }
 
-  grid.classList.remove("is-fading");
+  let images;
+  try {
+    images = await fetchImages(slug);
+  } catch (error) {
+    if (token !== switchToken) {
+      return;
+    }
+    grid.innerHTML = "";
+    empty.textContent = "Failed to load images.";
+    empty.classList.remove("hidden");
+    return;
+  }
+  if (token !== switchToken) {
+    return;
+  }
+
+  renderImages(images);
+  enterItems(Array.from(grid.querySelectorAll(".masonry-item")));
 }
 
 albumNavList.addEventListener("click", (event) => {
@@ -232,7 +319,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   setActive(null);
 
   try {
-    await loadImages(null);
+    const images = await fetchImages(null);
+    renderImages(images);
+    enterItems(Array.from(grid.querySelectorAll(".masonry-item")));
   } catch (error) {
     empty.textContent = "Failed to load images.";
     empty.classList.remove("hidden");
