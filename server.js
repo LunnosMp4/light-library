@@ -79,7 +79,8 @@ async function readMetadata() {
 
     return parsed.map((item) => ({
       ...item,
-      albums: Array.isArray(item.albums) ? item.albums : []
+      albums: Array.isArray(item.albums) ? item.albums : [],
+      isFeatured: Boolean(item.isFeatured)
     }));
   } catch (error) {
     if (error.code === "ENOENT") {
@@ -517,6 +518,12 @@ app.post("/admin/upload", requireAdmin, upload.single("photo"), async (req, res,
       const metadata = await sharp(file.path).metadata();
       const { exif, dateTaken } = await extractExif(file.path);
 
+      let width = metadata.width || null;
+      let height = metadata.height || null;
+      if (width != null && height != null && [5, 6, 7, 8].includes(metadata.orientation)) {
+        [width, height] = [height, width];
+      }
+
       const createdAt = new Date().toISOString();
       let resolvedDateTaken = dateTaken;
       if (!resolvedDateTaken) {
@@ -548,9 +555,10 @@ app.post("/admin/upload", requireAdmin, upload.single("photo"), async (req, res,
         thumb: `/uploads/thumbs/${thumbName}`,
         createdAt,
         dateTaken: resolvedDateTaken,
-        width: metadata.width || null,
-        height: metadata.height || null,
+        width,
+        height,
         albums: albumIds,
+        isFeatured: false,
         exif
       };
 
@@ -595,6 +603,38 @@ app.delete("/admin/images/:id", requireAdmin, async (req, res, next) => {
     ]);
 
     res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch("/admin/images/:id/featured", requireAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const items = await readMetadata();
+    const index = items.findIndex((item) => item.id === id);
+
+    if (index === -1) {
+      res.status(404).json({ ok: false, message: "Not found" });
+      return;
+    }
+
+    const isFeatured = Boolean(req.body && req.body.isFeatured);
+    const item = items[index];
+    const width = Number(item.width) || 0;
+    const height = Number(item.height) || 0;
+
+    if (isFeatured && width <= height) {
+      res
+        .status(400)
+        .json({ ok: false, message: "Only horizontal images can be featured" });
+      return;
+    }
+
+    item.isFeatured = isFeatured;
+    await saveMetadata(items);
+
+    res.json({ ok: true, image: item });
   } catch (error) {
     next(error);
   }

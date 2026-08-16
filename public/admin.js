@@ -145,6 +145,47 @@ async function updateImageAlbums(id, albumIds) {
   });
 }
 
+async function toggleFeatured(image, starButton) {
+  const next = !Boolean(image.isFeatured);
+
+  if (next && Number(image.width) <= Number(image.height)) {
+    uploadStatus.textContent = "Only horizontal images can be featured.";
+    return;
+  }
+
+  starButton.disabled = true;
+
+  try {
+    const payload = await apiJson(`/admin/images/${image.id}/featured`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isFeatured: next })
+    });
+
+    image.isFeatured = Boolean(payload.image && payload.image.isFeatured);
+    syncFeaturedCard(image);
+  } catch (error) {
+    uploadStatus.textContent = error.message;
+  } finally {
+    starButton.disabled = false;
+  }
+}
+
+function syncFeaturedCard(image) {
+  const card = adminGallery.querySelector(`.admin-card[data-id="${image.id}"]`);
+  if (!card) {
+    return;
+  }
+
+  const star = card.querySelector(".admin-star");
+  if (!star) {
+    return;
+  }
+
+  star.classList.toggle("featured", Boolean(image.isFeatured));
+  star.setAttribute("aria-pressed", String(Boolean(image.isFeatured)));
+}
+
 async function loadStorage() {
   if (!storageBox) {
     return;
@@ -477,6 +518,23 @@ function renderGallery(images) {
       toggleSelect(image.id);
     });
 
+    const horizontal = Number(image.width) > Number(image.height);
+    let star = null;
+    if (horizontal) {
+      star = document.createElement("button");
+      star.type = "button";
+      star.className = "admin-star";
+      star.setAttribute("aria-label", "Toggle featured");
+      star.setAttribute("aria-pressed", String(Boolean(image.isFeatured)));
+      star.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>';
+      star.classList.toggle("featured", Boolean(image.isFeatured));
+      star.addEventListener("click", (event) => {
+        event.stopPropagation();
+        toggleFeatured(image, star);
+      });
+    }
+
     const overlay = document.createElement("div");
     overlay.className = "admin-card-overlay";
 
@@ -500,13 +558,13 @@ function renderGallery(images) {
 
     const openEdit = () => openEditModal(image);
     card.addEventListener("click", (event) => {
-      if (event.target.closest(".admin-select")) {
+      if (event.target.closest(".admin-select, .admin-star")) {
         return;
       }
       openEdit();
     });
     card.addEventListener("keydown", (event) => {
-      if (event.target.closest(".admin-select")) {
+      if (event.target.closest(".admin-select, .admin-star")) {
         return;
       }
       if (event.key === "Enter" || event.key === " ") {
@@ -516,6 +574,9 @@ function renderGallery(images) {
     });
 
     card.append(select, thumb, overlay);
+    if (star) {
+      card.appendChild(star);
+    }
     fragment.appendChild(card);
   });
 

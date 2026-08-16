@@ -10,7 +10,6 @@ const albumNavList = document.getElementById("album-nav-list");
 
 let currentSlug = null;
 let currentImages = [];
-let renderedColumns = 0;
 let lightboxToken = 0;
 
 let isDragging = false;
@@ -174,15 +173,6 @@ function gridGap() {
   return Number.isFinite(gap) ? gap : 16;
 }
 
-function imageRatio(image) {
-  const width = Number(image.width) || 0;
-  const height = Number(image.height) || 0;
-  if (width > 0 && height > 0) {
-    return width / height;
-  }
-  return 1;
-}
-
 function renderImages(images) {
   currentImages = Array.isArray(images) ? images : [];
 
@@ -190,45 +180,81 @@ function renderImages(images) {
 
   if (currentImages.length === 0) {
     empty.classList.remove("hidden");
-    renderedColumns = 0;
     return;
   }
 
   empty.classList.add("hidden");
 
-  const columns = Math.min(responsiveColumnCount(), currentImages.length);
-  renderedColumns = columns;
-
-  const gap = gridGap();
-  const availableWidth = grid.clientWidth || 0;
-  const columnWidth =
-    columns > 0 && availableWidth > 0
-      ? (availableWidth - (columns - 1) * gap) / columns
-      : 0;
-
-  const columnEls = [];
-  const heights = new Array(columns).fill(0);
-
-  for (let i = 0; i < columns; i += 1) {
-    const column = document.createElement("div");
-    column.className = "masonry-column";
-    grid.appendChild(column);
-    columnEls.push(column);
-  }
+  const fragment = document.createDocumentFragment();
 
   currentImages.forEach((image, index) => {
     const item = buildImageItem(image);
     item.dataset.order = String(index);
+    if (image.isFeatured) {
+      item.classList.add("featured");
+    }
+    fragment.appendChild(item);
+  });
 
-    let shortest = 0;
-    for (let i = 1; i < columns; i += 1) {
-      if (heights[i] < heights[shortest]) {
-        shortest = i;
+  grid.appendChild(fragment);
+  layoutMasonry();
+}
+
+function layoutMasonry() {
+  if (currentImages.length === 0) {
+    return;
+  }
+
+  const columns = responsiveColumnCount();
+  const gap = gridGap();
+  const availableWidth = grid.clientWidth || 0;
+
+  if (availableWidth <= 0) {
+    return;
+  }
+
+  const columnWidth = (availableWidth - (columns - 1) * gap) / columns;
+  const nextRow = new Array(columns).fill(1);
+  const items = grid.querySelectorAll(".masonry-item");
+
+  currentImages.forEach((image, index) => {
+    const item = items[index];
+    if (!item) {
+      return;
+    }
+
+    const width = Number(image.width) || 0;
+    const height = Number(image.height) || 0;
+    const span = image.isFeatured ? 2 : 1;
+    const itemWidth = span * columnWidth + (span - 1) * gap;
+    const renderedHeight =
+      width > 0 && height > 0 ? (itemWidth / width) * height : itemWidth;
+    const rowSpan = Math.ceil((renderedHeight + gap) / 10);
+
+    let startCol = 0;
+    let startRow = Infinity;
+    const maxStart = span === 2 ? columns - 2 : columns - 1;
+
+    for (let col = 0; col <= maxStart; col += 1) {
+      let top = nextRow[col];
+      if (span === 2) {
+        top = Math.max(nextRow[col], nextRow[col + 1]);
+      }
+
+      if (top < startRow) {
+        startRow = top;
+        startCol = col;
       }
     }
 
-    columnEls[shortest].appendChild(item);
-    heights[shortest] += columnWidth / imageRatio(image) + gap;
+    item.style.gridColumnStart = String(startCol + 1);
+    item.style.gridColumnEnd = `span ${span}`;
+    item.style.gridRowStart = String(startRow);
+    item.style.gridRowEnd = `span ${rowSpan}`;
+
+    for (let col = startCol; col < startCol + span; col += 1) {
+      nextRow[col] = startRow + rowSpan;
+    }
   });
 }
 
@@ -458,11 +484,17 @@ albumNav.addEventListener(
   { passive: false }
 );
 
+let resizeFrame = null;
+
 window.addEventListener("resize", () => {
-  const columns = responsiveColumnCount();
-  if (renderedColumns > 0 && columns !== renderedColumns) {
-    renderImages(currentImages);
+  if (resizeFrame) {
+    return;
   }
+
+  resizeFrame = requestAnimationFrame(() => {
+    resizeFrame = null;
+    layoutMasonry();
+  });
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
