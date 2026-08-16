@@ -2,12 +2,14 @@ const grid = document.getElementById("grid");
 const empty = document.getElementById("empty");
 const lightbox = document.getElementById("lightbox");
 const lightboxImage = document.getElementById("lightbox-image");
+const polaroidWrapper = document.querySelector(".polaroid-img-wrapper");
 const exifData = document.getElementById("exif-data");
 const polaroidAction = document.getElementById("polaroid-action");
 const albumNav = document.getElementById("album-nav");
 const albumNavList = document.getElementById("album-nav-list");
 
 let currentSlug = null;
+let lightboxToken = 0;
 
 let isDragging = false;
 let dragMoved = false;
@@ -67,15 +69,50 @@ function renderExif(exif) {
   exifData.classList.remove("hidden");
 }
 
-function openLightbox(image) {
-  lightboxImage.src = image.original;
+function openLightbox(image, thumbImg) {
+  const token = ++lightboxToken;
+
+  let ratio = null;
+  if (thumbImg && thumbImg.naturalWidth > 0 && thumbImg.naturalHeight > 0) {
+    ratio = thumbImg.naturalWidth / thumbImg.naturalHeight;
+  } else {
+    const width = Number(image.width) || 0;
+    const height = Number(image.height) || 0;
+    if (width > 0 && height > 0) {
+      ratio = width / height;
+    }
+  }
+
+  lightboxImage.classList.add("loading");
+  if (ratio) {
+    polaroidWrapper.style.setProperty("--ratio", String(ratio));
+  }
+  lightboxImage.src = image.thumb;
   polaroidAction.href = image.original;
   renderExif(image.exif);
   lightbox.classList.remove("hidden");
+
+  const highResImg = new Image();
+  highResImg.onload = () => {
+    if (token !== lightboxToken) {
+      return;
+    }
+
+    lightboxImage.src = image.original;
+    lightboxImage.classList.remove("loading");
+  };
+  highResImg.onerror = () => {
+    if (token === lightboxToken) {
+      lightboxImage.classList.remove("loading");
+    }
+  };
+  highResImg.src = image.original;
 }
 
 function closeLightbox() {
+  lightboxToken += 1;
   lightbox.classList.add("hidden");
+  lightboxImage.classList.remove("loading");
   lightboxImage.src = "";
   polaroidAction.href = "#";
   exifData.textContent = "";
@@ -119,7 +156,11 @@ function buildImageItem(image) {
   }
 
   img.addEventListener("click", () => {
-    openLightbox(image);
+    if (window.matchMedia("(max-width: 768px)").matches) {
+      window.open(image.original, "_blank", "noopener,noreferrer");
+      return;
+    }
+    openLightbox(image, img);
   });
 
   item.appendChild(img);
@@ -146,19 +187,7 @@ function renderImages(images) {
 }
 
 function responsiveColumnCount() {
-  if (window.matchMedia("(min-width: 1600px)").matches) {
-    return 5;
-  }
-  if (window.matchMedia("(min-width: 1280px)").matches) {
-    return 4;
-  }
-  if (window.matchMedia("(min-width: 960px)").matches) {
-    return 3;
-  }
-  if (window.matchMedia("(min-width: 600px)").matches) {
-    return 2;
-  }
-  return 1;
+  return window.matchMedia("(max-width: 768px)").matches ? 2 : 4;
 }
 
 function applyColumnBalance(count) {

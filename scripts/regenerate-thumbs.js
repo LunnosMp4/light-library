@@ -2,7 +2,7 @@ const path = require("path");
 const fs = require("fs/promises");
 const sharp = require("sharp");
 
-const THUMB_SIZE = Number(process.env.THUMB_SIZE || 1200);
+const THUMB_SIZE = Number(process.env.THUMB_SIZE || 1600);
 const THUMB_QUALITY = Number(process.env.THUMB_QUALITY || 85);
 
 const ROOT = path.join(__dirname, "..");

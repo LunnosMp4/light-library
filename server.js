@@ -14,7 +14,7 @@ const PORT = Number(process.env.PORT || 3000);
 const ADMIN_USER = process.env.ADMIN_USER || "admin";
 const ADMIN_PASS = process.env.ADMIN_PASS || "changeme";
 const SESSION_SECRET = process.env.SESSION_SECRET || "change-me";
-const THUMB_SIZE = Number(process.env.THUMB_SIZE || 1200);
+const THUMB_SIZE = Number(process.env.THUMB_SIZE || 1600);
 const THUMB_QUALITY = Number(process.env.THUMB_QUALITY || 85);
 
 const DATA_DIR = path.join(__dirname, "data");

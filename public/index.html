@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Photo Stream</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -25,7 +25,9 @@
 
     <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true">
       <figure class="polaroid-frame">
-        <img id="lightbox-image" alt="Full size" />
+        <div class="polaroid-img-wrapper">
+          <img id="lightbox-image" class="polaroid-img" alt="Full size" />
+        </div>
         <figcaption id="exif-data" class="exif-data hidden"></figcaption>
         <a
           id="polaroid-action"
