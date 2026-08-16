@@ -111,8 +111,22 @@
         </section>
 
         <section id="view-library" class="view">
-          <h1 id="library-title">Library</h1>
+          <div class="library-head">
+            <h1 id="library-title">Library</h1>
+            <button id="select-all" class="ghost" type="button">Select all</button>
+          </div>
           <div id="admin-gallery" class="admin-gallery"></div>
+          <div id="selection-bar" class="selection-bar hidden">
+            <span id="selection-count" class="selection-count">0 selected</span>
+            <div class="selection-actions">
+              <button id="selection-clear" class="selection-clear" type="button">
+                Clear
+              </button>
+              <button id="selection-delete" class="selection-delete" type="button">
+                Delete
+              </button>
+            </div>
+          </div>
         </section>
       </main>
     </div>

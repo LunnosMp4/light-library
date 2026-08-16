@@ -22,6 +22,11 @@ const editAlbums = document.getElementById("edit-albums");
 const editSave = document.getElementById("edit-save");
 const editCancel = document.getElementById("edit-cancel");
 const libraryTitle = document.getElementById("library-title");
+const selectAllButton = document.getElementById("select-all");
+const selectionBar = document.getElementById("selection-bar");
+const selectionCount = document.getElementById("selection-count");
+const selectionClear = document.getElementById("selection-clear");
+const selectionDelete = document.getElementById("selection-delete");
 const navItems = Array.from(document.querySelectorAll(".nav-item"));
 const views = {
   upload: document.getElementById("view-upload"),
@@ -34,6 +39,8 @@ let albumCounts = new Map();
 let selectedUploadAlbums = new Set();
 let selectedFiles = [];
 let editingSelected = new Set();
+let selectedIds = new Set();
+let libraryImages = [];
 let currentFilter = null;
 let editingImage = null;
 
@@ -366,18 +373,22 @@ async function refreshCounts() {
 
 function renderGallery(images) {
   adminGallery.innerHTML = "";
+  libraryImages = Array.isArray(images) ? images : [];
+  selectedIds = new Set();
 
-  if (!Array.isArray(images) || images.length === 0) {
+  if (libraryImages.length === 0) {
     adminGallery.innerHTML =
-      '<div class="muted">No images in this view.</div>';
+      '<div class="empty-state"><p>No images in this view.</p><span>Upload photos to get started.</span></div>';
+    updateSelectionUI();
     return;
   }
 
   const fragment = document.createDocumentFragment();
 
-  images.forEach((image) => {
+  libraryImages.forEach((image) => {
     const card = document.createElement("div");
     card.className = "admin-card";
+    card.dataset.id = image.id;
     card.setAttribute("role", "button");
     card.tabIndex = 0;
     card.setAttribute("aria-label", "Edit albums");
@@ -389,29 +400,19 @@ function renderGallery(images) {
     thumb.loading = "lazy";
     thumb.decoding = "async";
 
+    const select = document.createElement("button");
+    select.type = "button";
+    select.className = "admin-select";
+    select.setAttribute("aria-label", "Select photo");
+    select.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>';
+    select.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleSelect(image.id);
+    });
+
     const overlay = document.createElement("div");
     overlay.className = "admin-card-overlay";
-
-    const deleteButton = document.createElement("button");
-    deleteButton.className = "admin-card-delete";
-    deleteButton.type = "button";
-    deleteButton.textContent = "\u00d7";
-    deleteButton.setAttribute("aria-label", "Delete photo");
-    deleteButton.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      if (!window.confirm("Delete this photo?")) {
-        return;
-      }
-
-      try {
-        await deletePhoto(image.id);
-        await loadGallery(currentFilter || undefined);
-        await refreshCounts();
-        await loadStorage();
-      } catch (error) {
-        uploadStatus.textContent = error.message;
-      }
-    });
 
     const chips = document.createElement("div");
     chips.className = "admin-chips";
@@ -429,22 +430,132 @@ function renderGallery(images) {
       });
     }
 
-    overlay.append(deleteButton, chips);
+    overlay.appendChild(chips);
 
     const openEdit = () => openEditModal(image);
-    card.addEventListener("click", openEdit);
+    card.addEventListener("click", (event) => {
+      if (event.target.closest(".admin-select")) {
+        return;
+      }
+      openEdit();
+    });
     card.addEventListener("keydown", (event) => {
+      if (event.target.closest(".admin-select")) {
+        return;
+      }
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         openEdit();
       }
     });
 
-    card.append(thumb, overlay);
+    card.append(select, thumb, overlay);
     fragment.appendChild(card);
   });
 
   adminGallery.appendChild(fragment);
+  updateSelectionUI();
+}
+
+function syncCardSelection(card) {
+  const active = selectedIds.has(card.dataset.id);
+  card.classList.toggle("selected", active);
+  const select = card.querySelector(".admin-select");
+  if (select) {
+    select.classList.toggle("checked", active);
+    select.setAttribute("aria-pressed", String(active));
+  }
+}
+
+function updateSelectionUI() {
+  const count = selectedIds.size;
+  const total = libraryImages.length;
+
+  selectionCount.textContent = `${count} selected`;
+  selectionBar.classList.toggle("hidden", count === 0);
+  selectAllButton.classList.toggle("hidden", total === 0);
+
+  if (count > 0 && count === total) {
+    selectAllButton.textContent = "Deselect all";
+  } else {
+    selectAllButton.textContent = "Select all";
+  }
+}
+
+function toggleSelect(id) {
+  if (selectedIds.has(id)) {
+    selectedIds.delete(id);
+  } else {
+    selectedIds.add(id);
+  }
+
+  const card = adminGallery.querySelector(`.admin-card[data-id="${id}"]`);
+  if (card) {
+    syncCardSelection(card);
+  }
+  updateSelectionUI();
+}
+
+function selectAll() {
+  if (selectedIds.size === libraryImages.length && libraryImages.length > 0) {
+    selectedIds = new Set();
+  } else {
+    selectedIds = new Set(libraryImages.map((image) => image.id));
+  }
+
+  adminGallery.querySelectorAll(".admin-card").forEach(syncCardSelection);
+  updateSelectionUI();
+}
+
+function clearSelection() {
+  selectedIds = new Set();
+  adminGallery.querySelectorAll(".admin-card").forEach(syncCardSelection);
+  updateSelectionUI();
+}
+
+function setSelectionBusy(busy) {
+  selectionDelete.disabled = busy;
+  selectionClear.disabled = busy;
+  selectAllButton.disabled = busy;
+  selectionDelete.textContent = busy ? "Deleting..." : "Delete";
+}
+
+async function deleteSelected() {
+  const ids = Array.from(selectedIds);
+  if (ids.length === 0) {
+    return;
+  }
+
+  if (
+    !window.confirm(`Delete ${ids.length} photo${ids.length === 1 ? "" : "s"}?`)
+  ) {
+    return;
+  }
+
+  setSelectionBusy(true);
+  let deleted = 0;
+  const failures = [];
+
+  for (let i = 0; i < ids.length; i += 1) {
+    selectionCount.textContent = `Deleting ${i + 1}/${ids.length}...`;
+    try {
+      await deletePhoto(ids[i]);
+      deleted += 1;
+    } catch (error) {
+      failures.push(error.message);
+    }
+  }
+
+  setSelectionBusy(false);
+  selectedIds = new Set();
+
+  await loadGallery(currentFilter || undefined);
+  await refreshCounts();
+  await loadStorage();
+
+  if (failures.length) {
+    uploadStatus.textContent = `${deleted} deleted, ${failures.length} failed.`;
+  }
 }
 
 async function loadGallery(albumSlug) {
@@ -780,6 +891,8 @@ logoutButton.addEventListener("click", async () => {
   currentFilter = null;
   editingImage = null;
   editingSelected = new Set();
+  selectedIds = new Set();
+  libraryImages = [];
 });
 
 navItems.forEach((item) => {
@@ -787,6 +900,10 @@ navItems.forEach((item) => {
     switchView(item.dataset.view);
   });
 });
+
+selectAllButton.addEventListener("click", selectAll);
+selectionClear.addEventListener("click", clearSelection);
+selectionDelete.addEventListener("click", deleteSelected);
 
 async function showDashboard() {
   loginView.classList.add("hidden");

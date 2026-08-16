@@ -818,6 +818,19 @@ input[type="file"] {
   gap: 12px;
 }
 
+.library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.library-head h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
 .admin-card {
   position: relative;
   aspect-ratio: 1 / 1;
@@ -826,6 +839,15 @@ input[type="file"] {
   border: 1px solid var(--line);
   background: #fff;
   cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.admin-card:hover {
+  transform: translateY(-1px);
+}
+
+.admin-card.selected {
+  box-shadow: inset 0 0 0 3px var(--accent);
 }
 
 .admin-thumb {
@@ -840,12 +862,12 @@ input[type="file"] {
   inset: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 8px;
   background: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.45),
-    rgba(0, 0, 0, 0) 40%,
+    rgba(0, 0, 0, 0.35),
+    rgba(0, 0, 0, 0) 45%,
     rgba(0, 0, 0, 0) 55%,
     rgba(0, 0, 0, 0.55)
   );
@@ -857,17 +879,53 @@ input[type="file"] {
   opacity: 1;
 }
 
-.admin-card-delete {
-  align-self: flex-end;
-  width: 30px;
-  height: 30px;
+.admin-select {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   border-radius: 999px;
-  border: none;
-  background: rgba(255, 255, 255, 0.9);
-  color: #b00020;
-  font-size: 1rem;
-  line-height: 1;
+  border: 2px solid #fff;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  opacity: 0;
+  transform: scale(0.85);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.admin-select svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.admin-card:hover .admin-select,
+.admin-select:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.admin-select.checked {
+  opacity: 1;
+  transform: scale(1);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.admin-select.checked svg {
+  opacity: 1;
 }
 
 .admin-chips {
@@ -887,6 +945,96 @@ input[type="file"] {
 .chip-none {
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.72rem;
+}
+
+.empty-state {
+  grid-column: 1 / -1;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 64px 20px;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.empty-state span {
+  font-size: 0.85rem;
+}
+
+/* ============ Selection bar ============ */
+
+.selection-bar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 10px 12px 10px 18px;
+  background: #111;
+  color: #fff;
+  border-radius: 14px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+}
+
+.selection-count {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.selection-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.selection-clear {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.selection-clear:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.selection-delete {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: none;
+  background: #e5484d;
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.selection-delete:hover {
+  background: #d33b40;
+}
+
+.selection-delete:disabled,
+.selection-clear:disabled,
+#select-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ============ Edit modal ============ */
