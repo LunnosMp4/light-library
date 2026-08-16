@@ -92,6 +92,7 @@ function openLightbox(image, thumbImg) {
   polaroidAction.href = image.original;
   renderExif(image.exif);
   lightbox.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
 
   const highResImg = new Image();
   highResImg.onload = () => {
@@ -118,6 +119,7 @@ function closeLightbox() {
   polaroidAction.href = "#";
   exifData.textContent = "";
   exifData.classList.add("hidden");
+  document.body.style.overflow = "";
 }
 
 lightbox.addEventListener("click", (event) => {
