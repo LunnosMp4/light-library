@@ -4,6 +4,7 @@ const express = require("express");
 const session = require("express-session");
 const multer = require("multer");
 const sharp = require("sharp");
+const exifr = require("exifr");
 const checkDiskSpace = require("check-disk-space").default;
 const { nanoid } = require("nanoid");
 
@@ -135,6 +136,51 @@ function normalizeIds(raw) {
   }
 
   return [String(raw)].filter(Boolean);
+}
+
+function toShutterFraction(seconds) {
+  if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) {
+    return null;
+  }
+
+  if (seconds >= 1) {
+    return String(Number(seconds.toFixed(1)));
+  }
+
+  return `1/${Math.round(1 / seconds)}`;
+}
+
+async function extractExif(filePath) {
+  try {
+    const data = await exifr.parse(filePath, [
+      "FNumber",
+      "ExposureTime",
+      "ISO",
+      "FocalLength"
+    ]);
+    if (!data) {
+      return null;
+    }
+
+    const exif = {};
+    if (data.FNumber) {
+      exif.aperture = Number(data.FNumber.toFixed(1));
+    }
+    const shutter = toShutterFraction(data.ExposureTime);
+    if (shutter) {
+      exif.shutter = shutter;
+    }
+    if (data.ISO) {
+      exif.iso = Number(data.ISO);
+    }
+    if (data.FocalLength) {
+      exif.focalLength = Math.round(data.FocalLength);
+    }
+
+    return Object.keys(exif).length ? exif : null;
+  } catch (error) {
+    return null;
+  }
 }
 
 function requireAdmin(req, res, next) {
@@ -412,6 +458,7 @@ app.post("/admin/upload", requireAdmin, upload.single("photo"), async (req, res,
 
     try {
       const metadata = await sharp(file.path).metadata();
+      const exif = await extractExif(file.path);
       await sharp(file.path)
         .rotate()
         .resize({
@@ -433,7 +480,8 @@ app.post("/admin/upload", requireAdmin, upload.single("photo"), async (req, res,
         createdAt: new Date().toISOString(),
         width: metadata.width || null,
         height: metadata.height || null,
-        albums: albumIds
+        albums: albumIds,
+        exif
       };
 
       items.push(record);

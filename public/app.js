@@ -2,7 +2,8 @@ const grid = document.getElementById("grid");
 const empty = document.getElementById("empty");
 const lightbox = document.getElementById("lightbox");
 const lightboxImage = document.getElementById("lightbox-image");
-const lightboxClose = document.getElementById("lightbox-close");
+const exifData = document.getElementById("exif-data");
+const polaroidAction = document.getElementById("polaroid-action");
 const albumNav = document.getElementById("album-nav");
 const albumNavList = document.getElementById("album-nav-list");
 
@@ -14,17 +15,52 @@ let suppressClick = false;
 let dragStartX = 0;
 let dragStartScrollLeft = 0;
 
-function openLightbox(src) {
-  lightboxImage.src = src;
+function renderExif(exif) {
+  if (!exif) {
+    exifData.textContent = "";
+    exifData.classList.add("hidden");
+    return;
+  }
+
+  const parts = [];
+  if (exif.focalLength != null) {
+    parts.push(`${exif.focalLength}mm`);
+  }
+  if (exif.aperture != null) {
+    parts.push(`f/${exif.aperture}`);
+  }
+  if (exif.shutter) {
+    parts.push(`${exif.shutter}s`);
+  }
+  if (exif.iso != null) {
+    parts.push(`ISO ${exif.iso}`);
+  }
+
+  if (!parts.length) {
+    exifData.textContent = "";
+    exifData.classList.add("hidden");
+    return;
+  }
+
+  exifData.textContent = parts.join(" • ");
+  exifData.classList.remove("hidden");
+}
+
+function openLightbox(image) {
+  lightboxImage.src = image.original;
+  polaroidAction.href = image.original;
+  renderExif(image.exif);
   lightbox.classList.remove("hidden");
 }
 
 function closeLightbox() {
   lightbox.classList.add("hidden");
   lightboxImage.src = "";
+  polaroidAction.href = "#";
+  exifData.textContent = "";
+  exifData.classList.add("hidden");
 }
 
-lightboxClose.addEventListener("click", closeLightbox);
 lightbox.addEventListener("click", (event) => {
   if (event.target === lightbox) {
     closeLightbox();
@@ -45,7 +81,6 @@ function buildImageItem(image) {
   img.alt = "Photo";
   img.decoding = "async";
   img.src = image.thumb;
-  img.dataset.full = image.original;
 
   const width = Number(image.width) || 0;
   const height = Number(image.height) || 0;
@@ -63,7 +98,7 @@ function buildImageItem(image) {
   }
 
   img.addEventListener("click", () => {
-    openLightbox(img.dataset.full);
+    openLightbox(image);
   });
 
   item.appendChild(img);

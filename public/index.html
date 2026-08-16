@@ -24,12 +24,26 @@
     </main>
 
     <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true">
-      <button id="lightbox-close" class="lightbox-close" aria-label="Close">
-        Close
-      </button>
-      <img id="lightbox-image" alt="Full size" />
+      <figure class="polaroid-frame">
+        <img id="lightbox-image" alt="Full size" />
+        <figcaption id="exif-data" class="exif-data hidden"></figcaption>
+        <a
+          id="polaroid-action"
+          class="polaroid-action-btn"
+          href="#"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View original image"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            <polyline points="15 3 21 3 21 9" />
+            <line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
+        </a>
+      </figure>
     </div>
 
-    <script src="/app.js?v=4" defer></script>
+    <script src="/app.js?v=6" defer></script>
   </body>
 </html>
