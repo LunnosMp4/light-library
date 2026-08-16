@@ -4,7 +4,7 @@ services:
   photo-stream:
     build: .
     ports:
-      - "5500:5500"
+      - "127.0.0.1:5500:5500"
     environment:
       PORT: ${PORT}
       ADMIN_USER: ${ADMIN_USER}
