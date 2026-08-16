@@ -153,6 +153,8 @@ function toShutterFraction(seconds) {
 async function extractExif(filePath) {
   try {
     const data = await exifr.parse(filePath, [
+      "Make",
+      "Model",
       "FNumber",
       "ExposureTime",
       "ISO",
@@ -163,6 +165,12 @@ async function extractExif(filePath) {
     }
 
     const exif = {};
+    if (data.Make) {
+      exif.make = String(data.Make).trim();
+    }
+    if (data.Model) {
+      exif.model = String(data.Model).trim();
+    }
     if (data.FNumber) {
       exif.aperture = Number(data.FNumber.toFixed(1));
     }

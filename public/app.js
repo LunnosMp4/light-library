@@ -15,6 +15,23 @@ let suppressClick = false;
 let dragStartX = 0;
 let dragStartScrollLeft = 0;
 
+function cameraLabel(exif) {
+  const make = exif.make ? String(exif.make).trim() : "";
+  const model = exif.model ? String(exif.model).trim() : "";
+
+  if (!make && !model) {
+    return null;
+  }
+
+  if (make && model) {
+    return model.toLowerCase().startsWith(make.toLowerCase())
+      ? model
+      : `${make} ${model}`;
+  }
+
+  return make || model;
+}
+
 function renderExif(exif) {
   if (!exif) {
     exifData.textContent = "";
@@ -23,6 +40,10 @@ function renderExif(exif) {
   }
 
   const parts = [];
+  const camera = cameraLabel(exif);
+  if (camera) {
+    parts.push(camera);
+  }
   if (exif.focalLength != null) {
     parts.push(`${exif.focalLength}mm`);
   }
@@ -120,6 +141,34 @@ function renderImages(images) {
     fragment.appendChild(buildImageItem(image));
   });
   grid.appendChild(fragment);
+
+  applyColumnBalance(images.length);
+}
+
+function responsiveColumnCount() {
+  if (window.matchMedia("(min-width: 1600px)").matches) {
+    return 5;
+  }
+  if (window.matchMedia("(min-width: 1280px)").matches) {
+    return 4;
+  }
+  if (window.matchMedia("(min-width: 960px)").matches) {
+    return 3;
+  }
+  if (window.matchMedia("(min-width: 600px)").matches) {
+    return 2;
+  }
+  return 1;
+}
+
+function applyColumnBalance(count) {
+  const columns = responsiveColumnCount();
+
+  if (count > 0 && count < columns) {
+    grid.style.columnCount = String(count);
+  } else {
+    grid.style.columnCount = "";
+  }
 }
 
 async function fetchImages(slug) {
@@ -339,6 +388,10 @@ albumNav.addEventListener(
   },
   { passive: false }
 );
+
+window.addEventListener("resize", () => {
+  applyColumnBalance(grid.querySelectorAll(".masonry-item").length);
+});
 
 document.addEventListener("DOMContentLoaded", async () => {
   let albums = [];

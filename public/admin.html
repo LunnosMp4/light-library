@@ -78,16 +78,26 @@
         <section id="view-upload" class="view active">
           <h1>Upload</h1>
           <form id="upload-form" class="stack">
-            <label class="field">
-              <span>Select images</span>
+            <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Upload photos">
               <input
+                id="file-input"
                 type="file"
                 name="photos"
                 multiple
                 accept="image/jpeg,image/png,image/heic,image/heif"
-                required
+                class="dropzone-input"
               />
-            </label>
+              <div class="dropzone-inner">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <p>Drag &amp; drop photos or <span class="dropzone-browse">click to browse</span></p>
+                <small>JPG, PNG, HEIC, HEIF</small>
+              </div>
+            </div>
+            <div id="preview-queue" class="preview-queue hidden"></div>
             <div class="field">
               <span>Add to albums</span>
               <div id="upload-albums" class="album-grid"></div>

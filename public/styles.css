@@ -593,39 +593,201 @@ input[type="file"] {
   font-size: 1.6rem;
 }
 
-/* ============ Album checkboxes ============ */
+/* ============ Album pills ============ */
 
 .album-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
-.album-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+.album-pill {
+  appearance: none;
+  padding: 8px 16px;
+  border-radius: 999px;
   border: 1px solid var(--line);
-  border-radius: 10px;
   background: #fff;
-  cursor: pointer;
+  font: inherit;
   font-size: 0.9rem;
   color: var(--ink);
-  transition: border-color 0.15s ease, background 0.15s ease;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease,
+    transform 0.1s ease;
 }
 
-.album-check:hover {
+.album-pill:hover {
   border-color: rgba(17, 17, 17, 0.3);
 }
 
-.album-check input {
-  accent-color: var(--accent);
+.album-pill:active {
+  transform: scale(0.97);
 }
 
-.album-check:has(input:checked) {
+.album-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ============ Dropzone & preview queue ============ */
+
+.dropzone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  border: 2px dashed rgba(17, 17, 17, 0.22);
+  border-radius: 16px;
+  background: #fff;
+  text-align: center;
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.dropzone:hover,
+.dropzone:focus-visible {
+  border-color: var(--accent);
+}
+
+.dropzone.dragover {
   border-color: var(--accent);
   background: rgba(17, 17, 17, 0.04);
+}
+
+.dropzone-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.dropzone-inner {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  color: var(--muted);
+}
+
+.dropzone-inner svg {
+  width: 32px;
+  height: 32px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.dropzone-inner p {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.dropzone-inner small {
+  font-size: 0.78rem;
+}
+
+.dropzone-browse {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.preview-queue {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.preview-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.preview-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: rgba(17, 17, 17, 0.05);
+  flex-shrink: 0;
+}
+
+.preview-meta {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-name {
+  font-size: 0.9rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-size {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.preview-remove {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  line-height: 1;
+  font-size: 1rem;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.preview-remove:hover {
+  color: #b00020;
+  border-color: rgba(176, 0, 32, 0.3);
+}
+
+/* ============ Storage meter ============ */
+
+.storage-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.storage-meter {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(17, 17, 17, 0.08);
+  overflow: hidden;
+}
+
+.storage-meter-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.4s ease;
 }
 
 /* ============ Library grid ============ */

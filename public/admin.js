@@ -12,6 +12,9 @@ const albumForm = document.getElementById("album-form");
 const albumStatus = document.getElementById("album-status");
 const albumList = document.getElementById("album-list");
 const uploadAlbums = document.getElementById("upload-albums");
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("file-input");
+const previewQueue = document.getElementById("preview-queue");
 const editModal = document.getElementById("edit-modal");
 const editThumb = document.getElementById("edit-thumb");
 const editFilename = document.getElementById("edit-filename");
@@ -29,6 +32,8 @@ let albums = [];
 let albumById = new Map();
 let albumCounts = new Map();
 let selectedUploadAlbums = new Set();
+let selectedFiles = [];
+let editingSelected = new Set();
 let currentFilter = null;
 let editingImage = null;
 
@@ -142,9 +147,16 @@ async function loadStorage() {
     const used = Number(payload.usedBytes) || 0;
     const total = Number(payload.totalBytes) || 0;
     const free = Number(payload.freeBytes) || 0;
+    const percent = total > 0 ? Math.min(100, (used / total) * 100) : 0;
 
     storageBox.innerHTML = `
-      <div>Storage used: ${formatGB(used)} / ${formatGB(total)}</div>
+      <div class="storage-row">
+        <span>Storage used</span>
+        <span>${formatGB(used)} / ${formatGB(total)}</span>
+      </div>
+      <div class="storage-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent.toFixed(1)}">
+        <div class="storage-meter-fill" style="width: ${percent.toFixed(1)}%"></div>
+      </div>
       <small>Free space: ${formatGB(free)}</small>
     `;
     storageBox.classList.remove("hidden");
@@ -174,26 +186,29 @@ function renderUploadAlbums() {
   const fragment = document.createDocumentFragment();
 
   albums.forEach((album) => {
-    const label = document.createElement("label");
-    label.className = "album-check";
+    const pill = document.createElement("button");
+    pill.type = "button";
+    pill.className = "album-pill";
+    pill.setAttribute("aria-pressed", "false");
+    pill.textContent = album.name;
 
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.value = album.id;
-    input.checked = selectedUploadAlbums.has(album.id);
-    input.addEventListener("change", () => {
-      if (input.checked) {
-        selectedUploadAlbums.add(album.id);
-      } else {
+    const syncState = () => {
+      const active = selectedUploadAlbums.has(album.id);
+      pill.classList.toggle("active", active);
+      pill.setAttribute("aria-pressed", String(active));
+    };
+
+    pill.addEventListener("click", () => {
+      if (selectedUploadAlbums.has(album.id)) {
         selectedUploadAlbums.delete(album.id);
+      } else {
+        selectedUploadAlbums.add(album.id);
       }
+      syncState();
     });
 
-    const span = document.createElement("span");
-    span.textContent = album.name;
-
-    label.append(input, span);
-    fragment.appendChild(label);
+    syncState();
+    fragment.appendChild(pill);
   });
 
   uploadAlbums.appendChild(fragment);
@@ -451,16 +466,18 @@ function openEditModal(image) {
   editingImage = image;
   editThumb.src = image.thumb;
   editFilename.textContent = image.filename || image.id;
-  renderEditAlbums(new Set(image.albums || []));
+  editingSelected = new Set(image.albums || []);
+  renderEditAlbums();
   editModal.classList.remove("hidden");
 }
 
 function closeEditModal() {
   editingImage = null;
+  editingSelected = new Set();
   editModal.classList.add("hidden");
 }
 
-function renderEditAlbums(selected) {
+function renderEditAlbums() {
   editAlbums.innerHTML = "";
 
   if (albums.length === 0) {
@@ -472,19 +489,29 @@ function renderEditAlbums(selected) {
   const fragment = document.createDocumentFragment();
 
   albums.forEach((album) => {
-    const label = document.createElement("label");
-    label.className = "album-check";
+    const pill = document.createElement("button");
+    pill.type = "button";
+    pill.className = "album-pill";
+    pill.setAttribute("aria-pressed", "false");
+    pill.textContent = album.name;
 
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.value = album.id;
-    input.checked = selected.has(album.id);
+    const syncState = () => {
+      const active = editingSelected.has(album.id);
+      pill.classList.toggle("active", active);
+      pill.setAttribute("aria-pressed", String(active));
+    };
 
-    const span = document.createElement("span");
-    span.textContent = album.name;
+    pill.addEventListener("click", () => {
+      if (editingSelected.has(album.id)) {
+        editingSelected.delete(album.id);
+      } else {
+        editingSelected.add(album.id);
+      }
+      syncState();
+    });
 
-    label.append(input, span);
-    fragment.appendChild(label);
+    syncState();
+    fragment.appendChild(pill);
   });
 
   editAlbums.appendChild(fragment);
@@ -499,6 +526,139 @@ function resetUploadProgress() {
   setProgress(0);
   uploadStatus.textContent = "";
 }
+
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "";
+  }
+
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+
+  return `${value.toFixed(value >= 10 || unit === 0 ? 0 : 1)} ${units[unit]}`;
+}
+
+function addFiles(fileList) {
+  const incoming = Array.from(fileList || []).filter((file) => {
+    const duplicate = selectedFiles.some(
+      (existing) => existing.name === file.name && existing.size === file.size
+    );
+    return !duplicate;
+  });
+
+  if (incoming.length) {
+    selectedFiles = selectedFiles.concat(incoming);
+    renderPreviewQueue();
+  }
+}
+
+function renderPreviewQueue() {
+  previewQueue.querySelectorAll(".preview-thumb").forEach((img) => {
+    if (img.src && img.src.startsWith("blob:")) {
+      URL.revokeObjectURL(img.src);
+    }
+  });
+  previewQueue.innerHTML = "";
+
+  if (selectedFiles.length === 0) {
+    previewQueue.classList.add("hidden");
+    return;
+  }
+
+  previewQueue.classList.remove("hidden");
+
+  const fragment = document.createDocumentFragment();
+
+  selectedFiles.forEach((file, index) => {
+    const item = document.createElement("div");
+    item.className = "preview-item";
+
+    const thumb = document.createElement("img");
+    thumb.className = "preview-thumb";
+    thumb.alt = "";
+    if (file.type && file.type.startsWith("image/")) {
+      thumb.src = URL.createObjectURL(file);
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "preview-meta";
+
+    const name = document.createElement("span");
+    name.className = "preview-name";
+    name.textContent = file.name;
+
+    const size = document.createElement("span");
+    size.className = "preview-size";
+    size.textContent = formatFileSize(file.size);
+
+    meta.append(name, size);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "preview-remove";
+    remove.textContent = "\u00d7";
+    remove.setAttribute("aria-label", `Remove ${file.name}`);
+    remove.addEventListener("click", () => {
+      selectedFiles.splice(index, 1);
+      renderPreviewQueue();
+    });
+
+    item.append(thumb, meta, remove);
+    fragment.appendChild(item);
+  });
+
+  previewQueue.appendChild(fragment);
+}
+
+function clearSelectedFiles() {
+  selectedFiles = [];
+  renderPreviewQueue();
+  if (fileInput) {
+    fileInput.value = "";
+  }
+}
+
+dropzone.addEventListener("click", () => {
+  fileInput.click();
+});
+
+fileInput.addEventListener("change", () => {
+  addFiles(fileInput.files);
+  fileInput.value = "";
+});
+
+dropzone.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    fileInput.click();
+  }
+});
+
+["dragenter", "dragover"].forEach((type) => {
+  dropzone.addEventListener(type, (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dropzone.classList.add("dragover");
+  });
+});
+
+["dragleave", "drop"].forEach((type) => {
+  dropzone.addEventListener(type, (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    dropzone.classList.remove("dragover");
+  });
+});
+
+dropzone.addEventListener("drop", (event) => {
+  addFiles(event.dataTransfer && event.dataTransfer.files);
+});
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -522,8 +682,7 @@ uploadForm.addEventListener("submit", async (event) => {
   setProgress(0);
 
   try {
-    const input = uploadForm.querySelector('input[type="file"]');
-    const files = Array.from(input.files || []);
+    const files = selectedFiles.slice();
 
     if (files.length === 0) {
       uploadStatus.textContent = "Select at least one file.";
@@ -545,7 +704,7 @@ uploadForm.addEventListener("submit", async (event) => {
     }
 
     uploadStatus.textContent = "Upload complete.";
-    uploadForm.reset();
+    clearSelectedFiles();
     await loadGallery(currentFilter || undefined);
     await refreshCounts();
     await loadStorage();
@@ -584,9 +743,7 @@ editSave.addEventListener("click", async () => {
     return;
   }
 
-  const checked = Array.from(
-    editAlbums.querySelectorAll('input[type="checkbox"]:checked')
-  ).map((input) => input.value);
+  const checked = Array.from(editingSelected);
 
   try {
     await updateImageAlbums(editingImage.id, checked);
@@ -618,9 +775,11 @@ logoutButton.addEventListener("click", async () => {
   loginView.classList.remove("hidden");
   loginForm.reset();
   resetUploadProgress();
+  clearSelectedFiles();
   selectedUploadAlbums.clear();
   currentFilter = null;
   editingImage = null;
+  editingSelected = new Set();
 });
 
 navItems.forEach((item) => {
