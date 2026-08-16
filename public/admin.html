@@ -15,32 +15,67 @@
   <body class="admin-body">
     <div class="noise-background" aria-hidden="true"></div>
 
-    <main class="admin-shell">
+    <main id="login-view" class="login-wrap">
       <section class="panel">
         <div class="panel-title">Admin</div>
+        <h1>Sign in</h1>
+        <form id="login-form" class="stack">
+          <label class="field">
+            <span>Username</span>
+            <input type="text" name="username" autocomplete="username" required />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input
+              type="password"
+              name="password"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+          <button class="primary" type="submit">Login</button>
+        </form>
+        <div id="login-status" class="status"></div>
+      </section>
+    </main>
 
-        <div id="login-panel">
-          <h1>Sign in</h1>
-          <form id="login-form" class="stack">
-            <label class="field">
-              <span>Username</span>
-              <input type="text" name="username" autocomplete="username" required />
-            </label>
-            <label class="field">
-              <span>Password</span>
-              <input
-                type="password"
-                name="password"
-                autocomplete="current-password"
-                required
-              />
-            </label>
-            <button class="primary" type="submit">Login</button>
+    <div id="dashboard" class="dashboard hidden">
+      <aside class="sidebar">
+        <div class="brand">Photo Admin</div>
+
+        <nav class="nav">
+          <button class="nav-item active" data-view="upload" type="button">
+            Upload
+          </button>
+          <button class="nav-item" data-view="library" type="button">
+            Library
+          </button>
+        </nav>
+
+        <section class="sidebar-section">
+          <div class="sidebar-title">Albums</div>
+          <form id="album-form" class="album-form">
+            <input
+              type="text"
+              name="name"
+              placeholder="New album name"
+              autocomplete="off"
+              required
+            />
+            <button class="primary" type="submit">Create</button>
           </form>
-          <div id="login-status" class="status"></div>
-        </div>
+          <div id="album-status" class="status"></div>
+          <div id="album-list" class="album-list"></div>
+        </section>
 
-        <div id="upload-panel" class="hidden">
+        <div class="sidebar-footer">
+          <div id="storage" class="storage hidden"></div>
+          <button id="logout" class="ghost" type="button">Logout</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <section id="view-upload" class="view active">
           <h1>Upload</h1>
           <form id="upload-form" class="stack">
             <label class="field">
@@ -53,23 +88,45 @@
                 required
               />
             </label>
+            <div class="field">
+              <span>Add to albums</span>
+              <div id="upload-albums" class="album-grid"></div>
+            </div>
             <button class="primary" type="submit">Upload</button>
-            <button id="logout" class="ghost" type="button">Logout</button>
           </form>
           <div class="progress">
             <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
           </div>
-          <div id="storage" class="storage hidden"></div>
-          <small class="status">Existing thumbnails keep their old quality until regenerated.</small>
           <div id="upload-status" class="status"></div>
-        </div>
-      </section>
+        </section>
 
-      <section id="gallery-panel" class="panel hidden">
-        <div class="panel-title">Library</div>
-        <div id="admin-gallery" class="admin-gallery"></div>
-      </section>
-    </main>
+        <section id="view-library" class="view">
+          <h1 id="library-title">Library</h1>
+          <div id="admin-gallery" class="admin-gallery"></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="edit-modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-backdrop" data-close></div>
+      <div class="modal-panel">
+        <div class="modal-head">
+          <img id="edit-thumb" alt="" />
+          <div class="modal-heading">
+            <h2>Edit albums</h2>
+            <div id="edit-filename" class="muted"></div>
+          </div>
+          <button class="modal-close" type="button" data-close aria-label="Close">
+            &times;
+          </button>
+        </div>
+        <div id="edit-albums" class="album-grid"></div>
+        <div class="modal-actions">
+          <button id="edit-cancel" class="ghost" type="button">Cancel</button>
+          <button id="edit-save" class="primary" type="button">Save</button>
+        </div>
+      </div>
+    </div>
 
     <script src="/admin.js" defer></script>
   </body>

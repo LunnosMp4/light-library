@@ -1,18 +1,50 @@
 const loginForm = document.getElementById("login-form");
 const loginStatus = document.getElementById("login-status");
-const loginPanel = document.getElementById("login-panel");
-const uploadPanel = document.getElementById("upload-panel");
+const loginView = document.getElementById("login-view");
+const dashboard = document.getElementById("dashboard");
 const uploadForm = document.getElementById("upload-form");
 const uploadStatus = document.getElementById("upload-status");
 const logoutButton = document.getElementById("logout");
 const progressBar = document.getElementById("progress-bar");
-const galleryPanel = document.getElementById("gallery-panel");
 const adminGallery = document.getElementById("admin-gallery");
 const storageBox = document.getElementById("storage");
+const albumForm = document.getElementById("album-form");
+const albumStatus = document.getElementById("album-status");
+const albumList = document.getElementById("album-list");
+const uploadAlbums = document.getElementById("upload-albums");
+const editModal = document.getElementById("edit-modal");
+const editThumb = document.getElementById("edit-thumb");
+const editFilename = document.getElementById("edit-filename");
+const editAlbums = document.getElementById("edit-albums");
+const editSave = document.getElementById("edit-save");
+const editCancel = document.getElementById("edit-cancel");
+const libraryTitle = document.getElementById("library-title");
+const navItems = Array.from(document.querySelectorAll(".nav-item"));
+const views = {
+  upload: document.getElementById("view-upload"),
+  library: document.getElementById("view-library")
+};
+
+let albums = [];
+let albumById = new Map();
+let albumCounts = new Map();
+let selectedUploadAlbums = new Set();
+let currentFilter = null;
+let editingImage = null;
 
 function formatGB(bytes) {
-  const gb = bytes / (1024 ** 3);
+  const gb = bytes / 1024 ** 3;
   return `${gb.toFixed(2)} GB`;
+}
+
+function switchView(name) {
+  Object.entries(views).forEach(([key, element]) => {
+    element.classList.toggle("active", key === name);
+  });
+
+  navItems.forEach((item) => {
+    item.classList.toggle("active", item.dataset.view === name);
+  });
 }
 
 async function login(username, password) {
@@ -34,11 +66,27 @@ async function checkSession() {
   return Boolean(payload && payload.isAdmin);
 }
 
-function uploadSingle(file, progressCallback) {
+async function apiJson(url, options = {}) {
+  const response = await fetch(url, {
+    credentials: "include",
+    ...options
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(payload.message || "Request failed");
+  }
+
+  return payload;
+}
+
+function uploadSingle(file, albumIds, progressCallback) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const formData = new FormData();
     formData.append("photo", file, file.name);
+    albumIds.forEach((id) => formData.append("album_ids", id));
 
     xhr.open("POST", "/admin/upload");
     xhr.withCredentials = true;
@@ -73,15 +121,15 @@ function uploadSingle(file, progressCallback) {
 }
 
 async function deletePhoto(id) {
-  const response = await fetch(`/admin/images/${id}`, {
-    method: "DELETE",
-    credentials: "include"
-  });
+  await apiJson(`/admin/images/${id}`, { method: "DELETE" });
+}
 
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.message || "Delete failed");
-  }
+async function updateImageAlbums(id, albumIds) {
+  return apiJson(`/admin/images/${id}/albums`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ album_ids: albumIds })
+  });
 }
 
 async function loadStorage() {
@@ -90,12 +138,7 @@ async function loadStorage() {
   }
 
   try {
-    const response = await fetch("/admin/storage", { credentials: "include" });
-    if (!response.ok) {
-      throw new Error("Storage unavailable");
-    }
-
-    const payload = await response.json();
+    const payload = await apiJson("/admin/storage");
     const used = Number(payload.usedBytes) || 0;
     const total = Number(payload.totalBytes) || 0;
     const free = Number(payload.freeBytes) || 0;
@@ -111,58 +154,350 @@ async function loadStorage() {
   }
 }
 
+async function loadAlbums() {
+  const response = await fetch("/albums");
+  albums = await response.json();
+  albumById = new Map(albums.map((album) => [album.id, album]));
+  renderUploadAlbums();
+  renderAlbumList();
+}
+
+function renderUploadAlbums() {
+  uploadAlbums.innerHTML = "";
+
+  if (albums.length === 0) {
+    uploadAlbums.innerHTML =
+      '<div class="muted">No albums yet. Create one in the sidebar.</div>';
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+
+  albums.forEach((album) => {
+    const label = document.createElement("label");
+    label.className = "album-check";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = album.id;
+    input.checked = selectedUploadAlbums.has(album.id);
+    input.addEventListener("change", () => {
+      if (input.checked) {
+        selectedUploadAlbums.add(album.id);
+      } else {
+        selectedUploadAlbums.delete(album.id);
+      }
+    });
+
+    const span = document.createElement("span");
+    span.textContent = album.name;
+
+    label.append(input, span);
+    fragment.appendChild(label);
+  });
+
+  uploadAlbums.appendChild(fragment);
+}
+
+function renderAlbumList() {
+  albumList.innerHTML = "";
+
+  const allButton = document.createElement("button");
+  allButton.type = "button";
+  allButton.className = "album-item" + (currentFilter === null ? " active" : "");
+  allButton.innerHTML = `<span>All Images</span><span class="album-count">${
+    albumCounts.get("__all__") ?? 0
+  }</span>`;
+  allButton.addEventListener("click", () => {
+    currentFilter = null;
+    renderAlbumList();
+    loadGallery();
+    switchView("library");
+  });
+  albumList.appendChild(allButton);
+
+  albums.forEach((album) => {
+    const item = document.createElement("div");
+    item.className =
+      "album-item" + (currentFilter === album.slug ? " active" : "");
+    item.setAttribute("role", "button");
+    item.tabIndex = 0;
+
+    const label = document.createElement("span");
+    label.className = "album-label";
+    label.textContent = album.name;
+
+    const count = document.createElement("span");
+    count.className = "album-count";
+    count.textContent = albumCounts.get(album.id) ?? 0;
+
+    const actions = document.createElement("span");
+    actions.className = "album-actions";
+
+    const renameButton = document.createElement("button");
+    renameButton.type = "button";
+    renameButton.className = "album-action";
+    renameButton.textContent = "Rename";
+    renameButton.setAttribute("aria-label", `Rename ${album.name}`);
+    renameButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      renameAlbum(album);
+    });
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "album-action danger";
+    deleteButton.textContent = "Delete";
+    deleteButton.setAttribute("aria-label", `Delete ${album.name}`);
+    deleteButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteAlbum(album);
+    });
+
+    actions.append(renameButton, deleteButton);
+
+    const openAlbum = () => {
+      currentFilter = album.slug;
+      renderAlbumList();
+      loadGallery(album.slug);
+      switchView("library");
+    };
+
+    item.addEventListener("click", openAlbum);
+    item.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openAlbum();
+      }
+    });
+
+    item.append(label, count, actions);
+    albumList.appendChild(item);
+  });
+}
+
+async function renameAlbum(album) {
+  const name = window.prompt("Rename album", album.name);
+
+  if (name == null || !name.trim()) {
+    return;
+  }
+
+  try {
+    const payload = await apiJson(`/admin/albums/${album.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim() })
+    });
+
+    if (currentFilter === album.slug) {
+      currentFilter = payload.album.slug;
+    }
+
+    await loadAlbums();
+    if (currentFilter) {
+      await loadGallery(currentFilter);
+    }
+  } catch (error) {
+    albumStatus.textContent = error.message;
+  }
+}
+
+async function deleteAlbum(album) {
+  const count = albumCounts.get(album.id) ?? 0;
+
+  if (!window.confirm(`Delete album "${album.name}"?`)) {
+    return;
+  }
+
+  const deleteImages = window.confirm(
+    `Delete the ${count} image(s) in this album too?\n\n` +
+      `OK = delete the images as well\nCancel = keep the images (move to All Images)`
+  );
+
+  try {
+    const query = deleteImages ? "?deleteImages=1" : "";
+    await apiJson(`/admin/albums/${album.id}${query}`, { method: "DELETE" });
+
+    if (currentFilter === album.slug) {
+      currentFilter = null;
+    }
+
+    await loadAlbums();
+    await refreshCounts();
+    await loadGallery(currentFilter || undefined);
+    await loadStorage();
+  } catch (error) {
+    albumStatus.textContent = error.message;
+  }
+}
+
+async function refreshCounts() {
+  const response = await fetch("/images", { cache: "no-store" });
+  const images = await response.json();
+  albumCounts = new Map();
+
+  if (Array.isArray(images)) {
+    albumCounts.set("__all__", images.length);
+    images.forEach((image) => {
+      (image.albums || []).forEach((albumId) => {
+        albumCounts.set(albumId, (albumCounts.get(albumId) || 0) + 1);
+      });
+    });
+  }
+
+  renderAlbumList();
+}
+
 function renderGallery(images) {
   adminGallery.innerHTML = "";
 
   if (!Array.isArray(images) || images.length === 0) {
-    galleryPanel.classList.add("hidden");
+    adminGallery.innerHTML =
+      '<div class="muted">No images in this view.</div>';
     return;
   }
 
-  galleryPanel.classList.remove("hidden");
+  const fragment = document.createDocumentFragment();
 
   images.forEach((image) => {
     const card = document.createElement("div");
     card.className = "admin-card";
+    card.setAttribute("role", "button");
+    card.tabIndex = 0;
+    card.setAttribute("aria-label", "Edit albums");
 
     const thumb = document.createElement("img");
     thumb.className = "admin-thumb";
     thumb.src = image.thumb;
     thumb.alt = "";
+    thumb.loading = "lazy";
+    thumb.decoding = "async";
 
-    const meta = document.createElement("div");
-    meta.className = "admin-meta";
-    meta.textContent = image.filename || image.id;
+    const overlay = document.createElement("div");
+    overlay.className = "admin-card-overlay";
 
-    const button = document.createElement("button");
-    button.className = "ghost danger";
-    button.type = "button";
-    button.textContent = "x";
-    button.setAttribute("aria-label", "Delete photo");
-    button.addEventListener("click", async () => {
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "admin-card-delete";
+    deleteButton.type = "button";
+    deleteButton.textContent = "\u00d7";
+    deleteButton.setAttribute("aria-label", "Delete photo");
+    deleteButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (!window.confirm("Delete this photo?")) {
+        return;
+      }
+
       try {
         await deletePhoto(image.id);
-        await loadGallery();
+        await loadGallery(currentFilter || undefined);
+        await refreshCounts();
         await loadStorage();
       } catch (error) {
         uploadStatus.textContent = error.message;
       }
     });
 
-    card.append(thumb, meta, button);
-    adminGallery.appendChild(card);
+    const chips = document.createElement("div");
+    chips.className = "admin-chips";
+    const imageAlbums = image.albums || [];
+
+    if (imageAlbums.length === 0) {
+      chips.innerHTML = '<span class="chip-none">No album</span>';
+    } else {
+      imageAlbums.forEach((albumId) => {
+        const album = albumById.get(albumId);
+        const chip = document.createElement("span");
+        chip.className = "chip";
+        chip.textContent = album ? album.name : albumId;
+        chips.appendChild(chip);
+      });
+    }
+
+    overlay.append(deleteButton, chips);
+
+    const openEdit = () => openEditModal(image);
+    card.addEventListener("click", openEdit);
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openEdit();
+      }
+    });
+
+    card.append(thumb, overlay);
+    fragment.appendChild(card);
   });
+
+  adminGallery.appendChild(fragment);
 }
 
-async function loadGallery() {
-  const response = await fetch("/images", { cache: "no-store" });
+async function loadGallery(albumSlug) {
+  const query = albumSlug ? `?album=${encodeURIComponent(albumSlug)}` : "";
+  const response = await fetch(`/images${query}`, { cache: "no-store" });
   const images = await response.json();
+
+  if (albumSlug) {
+    const album = albums.find((entry) => entry.slug === albumSlug);
+    libraryTitle.textContent = album ? album.name : "Library";
+  } else {
+    libraryTitle.textContent = "Library";
+  }
+
   renderGallery(images);
+}
+
+function openEditModal(image) {
+  editingImage = image;
+  editThumb.src = image.thumb;
+  editFilename.textContent = image.filename || image.id;
+  renderEditAlbums(new Set(image.albums || []));
+  editModal.classList.remove("hidden");
+}
+
+function closeEditModal() {
+  editingImage = null;
+  editModal.classList.add("hidden");
+}
+
+function renderEditAlbums(selected) {
+  editAlbums.innerHTML = "";
+
+  if (albums.length === 0) {
+    editAlbums.innerHTML =
+      '<div class="muted">No albums yet. Create one in the sidebar.</div>';
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+
+  albums.forEach((album) => {
+    const label = document.createElement("label");
+    label.className = "album-check";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = album.id;
+    input.checked = selected.has(album.id);
+
+    const span = document.createElement("span");
+    span.textContent = album.name;
+
+    label.append(input, span);
+    fragment.appendChild(label);
+  });
+
+  editAlbums.appendChild(fragment);
 }
 
 function setProgress(value) {
   const percent = Math.max(0, Math.min(100, value * 100));
   progressBar.style.width = `${percent.toFixed(1)}%`;
+}
+
+function resetUploadProgress() {
+  setProgress(0);
+  uploadStatus.textContent = "";
 }
 
 loginForm.addEventListener("submit", async (event) => {
@@ -175,12 +510,7 @@ loginForm.addEventListener("submit", async (event) => {
 
   try {
     await login(username, password);
-    loginPanel.classList.add("hidden");
-    uploadPanel.classList.remove("hidden");
-    uploadStatus.textContent = "";
-    setProgress(0);
-    await loadGallery();
-    await loadStorage();
+    await showDashboard();
   } catch (error) {
     loginStatus.textContent = error.message;
   }
@@ -192,7 +522,7 @@ uploadForm.addEventListener("submit", async (event) => {
   setProgress(0);
 
   try {
-    const input = uploadForm.querySelector("input[type=\"file\"]");
+    const input = uploadForm.querySelector('input[type="file"]');
     const files = Array.from(input.files || []);
 
     if (files.length === 0) {
@@ -200,11 +530,12 @@ uploadForm.addEventListener("submit", async (event) => {
       return;
     }
 
+    const albumIds = Array.from(selectedUploadAlbums);
     let completed = 0;
 
     for (const file of files) {
       uploadStatus.textContent = `Uploading ${completed + 1}/${files.length}...`;
-      await uploadSingle(file, (currentProgress) => {
+      await uploadSingle(file, albumIds, (currentProgress) => {
         const overall = (completed + currentProgress) / files.length;
         setProgress(overall);
       });
@@ -215,33 +546,104 @@ uploadForm.addEventListener("submit", async (event) => {
 
     uploadStatus.textContent = "Upload complete.";
     uploadForm.reset();
-    await loadGallery();
+    await loadGallery(currentFilter || undefined);
+    await refreshCounts();
     await loadStorage();
   } catch (error) {
     uploadStatus.textContent = error.message;
   }
 });
 
+albumForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  albumStatus.textContent = "";
+
+  const formData = new FormData(albumForm);
+  const name = String(formData.get("name") || "").trim();
+
+  if (!name) {
+    return;
+  }
+
+  try {
+    await apiJson("/admin/albums", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    albumForm.reset();
+    albumStatus.textContent = "";
+    await loadAlbums();
+  } catch (error) {
+    albumStatus.textContent = error.message;
+  }
+});
+
+editSave.addEventListener("click", async () => {
+  if (!editingImage) {
+    return;
+  }
+
+  const checked = Array.from(
+    editAlbums.querySelectorAll('input[type="checkbox"]:checked')
+  ).map((input) => input.value);
+
+  try {
+    await updateImageAlbums(editingImage.id, checked);
+    closeEditModal();
+    await loadGallery(currentFilter || undefined);
+    await refreshCounts();
+  } catch (error) {
+    uploadStatus.textContent = error.message;
+  }
+});
+
+editCancel.addEventListener("click", closeEditModal);
+
+editModal.addEventListener("click", (event) => {
+  if (event.target.dataset.close !== undefined) {
+    closeEditModal();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !editModal.classList.contains("hidden")) {
+    closeEditModal();
+  }
+});
+
 logoutButton.addEventListener("click", async () => {
   await fetch("/admin/logout", { method: "POST", credentials: "include" });
-  uploadPanel.classList.add("hidden");
-  loginPanel.classList.remove("hidden");
-  galleryPanel.classList.add("hidden");
+  dashboard.classList.add("hidden");
+  loginView.classList.remove("hidden");
   loginForm.reset();
-  uploadForm.reset();
-  uploadStatus.textContent = "";
-  setProgress(0);
+  resetUploadProgress();
+  selectedUploadAlbums.clear();
+  currentFilter = null;
+  editingImage = null;
 });
+
+navItems.forEach((item) => {
+  item.addEventListener("click", () => {
+    switchView(item.dataset.view);
+  });
+});
+
+async function showDashboard() {
+  loginView.classList.add("hidden");
+  dashboard.classList.remove("hidden");
+  resetUploadProgress();
+  await loadAlbums();
+  await refreshCounts();
+  await loadGallery(currentFilter || undefined);
+  await loadStorage();
+  switchView("upload");
+}
 
 checkSession()
   .then((isAdmin) => {
     if (isAdmin) {
-      loginPanel.classList.add("hidden");
-      uploadPanel.classList.remove("hidden");
-      loadGallery().catch(() => {
-        void 0;
-      });
-      loadStorage().catch(() => {
+      showDashboard().catch(() => {
         void 0;
       });
     }

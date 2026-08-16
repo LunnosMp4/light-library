@@ -21,6 +21,7 @@ const UPLOAD_DIR = path.join(__dirname, "uploads");
 const ORIGINAL_DIR = path.join(UPLOAD_DIR, "original");
 const THUMB_DIR = path.join(UPLOAD_DIR, "thumbs");
 const METADATA_FILE = path.join(DATA_DIR, "metadata.json");
+const ALBUMS_FILE = path.join(DATA_DIR, "albums.json");
 const TEMP_DIR = path.join(UPLOAD_DIR, "tmp");
 
 const allowedMime = new Set([
@@ -38,6 +39,7 @@ const extByMime = {
 };
 
 let writeQueue = Promise.resolve();
+let albumsWriteQueue = Promise.resolve();
 
 async function ensureStorage() {
   await fs.mkdir(DATA_DIR, { recursive: true });
@@ -50,10 +52,19 @@ async function ensureStorage() {
   } catch (error) {
     if (error.code === "ENOENT") {
       await fs.writeFile(METADATA_FILE, "[]");
-      return;
+    } else {
+      throw error;
     }
+  }
 
-    throw error;
+  try {
+    await fs.access(ALBUMS_FILE);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      await fs.writeFile(ALBUMS_FILE, "[]");
+    } else {
+      throw error;
+    }
   }
 }
 
@@ -61,7 +72,14 @@ async function readMetadata() {
   try {
     const raw = await fs.readFile(METADATA_FILE, "utf8");
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.map((item) => ({
+      ...item,
+      albums: Array.isArray(item.albums) ? item.albums : []
+    }));
   } catch (error) {
     if (error.code === "ENOENT") {
       return [];
@@ -76,6 +94,47 @@ function saveMetadata(items) {
     fs.writeFile(METADATA_FILE, JSON.stringify(items, null, 2))
   );
   return writeQueue;
+}
+
+async function readAlbums() {
+  try {
+    const raw = await fs.readFile(ALBUMS_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return [];
+    }
+
+    return [];
+  }
+}
+
+function saveAlbums(items) {
+  albumsWriteQueue = albumsWriteQueue.then(() =>
+    fs.writeFile(ALBUMS_FILE, JSON.stringify(items, null, 2))
+  );
+  return albumsWriteQueue;
+}
+
+function slugify(value) {
+  return String(value || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function normalizeIds(raw) {
+  if (raw == null) {
+    return [];
+  }
+
+  if (Array.isArray(raw)) {
+    return raw.map((value) => String(value)).filter(Boolean);
+  }
+
+  return [String(raw)].filter(Boolean);
 }
 
 function requireAdmin(req, res, next) {
@@ -129,11 +188,169 @@ app.get("/", (req, res) => {
 });
 
 app.get("/images", async (req, res) => {
-  const images = await readMetadata();
+  const { album } = req.query;
+  let images = await readMetadata();
   images.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
+
+  if (album) {
+    const albums = await readAlbums();
+    const target = albums.find((entry) => entry.slug === album);
+
+    if (target) {
+      images = images.filter(
+        (image) =>
+          Array.isArray(image.albums) && image.albums.includes(target.id)
+      );
+    } else {
+      images = [];
+    }
+  }
+
   res.json(images);
+});
+
+app.get("/albums", async (req, res) => {
+  const albums = await readAlbums();
+  albums.sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+  res.json(albums);
+});
+
+app.post("/admin/albums", requireAdmin, async (req, res, next) => {
+  try {
+    const name = String((req.body && req.body.name) || "").trim();
+
+    if (!name) {
+      res.status(400).json({ ok: false, message: "Album name is required" });
+      return;
+    }
+
+    const albums = await readAlbums();
+    const base = slugify(name) || "album";
+    const existing = new Set(albums.map((entry) => entry.slug));
+
+    let slug = base;
+    let counter = 2;
+    while (existing.has(slug)) {
+      slug = `${base}-${counter}`;
+      counter += 1;
+    }
+
+    const album = {
+      id: nanoid(),
+      name,
+      slug,
+      createdAt: new Date().toISOString()
+    };
+
+    albums.push(album);
+    await saveAlbums(albums);
+
+    res.json({ ok: true, album });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch("/admin/albums/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const name = String((req.body && req.body.name) || "").trim();
+
+    if (!name) {
+      res.status(400).json({ ok: false, message: "Album name is required" });
+      return;
+    }
+
+    const albums = await readAlbums();
+    const album = albums.find((entry) => entry.id === id);
+
+    if (!album) {
+      res.status(404).json({ ok: false, message: "Not found" });
+      return;
+    }
+
+    album.name = name;
+
+    const base = slugify(name) || "album";
+    const existing = new Set(
+      albums.filter((entry) => entry.id !== id).map((entry) => entry.slug)
+    );
+
+    let slug = base;
+    let counter = 2;
+    while (existing.has(slug)) {
+      slug = `${base}-${counter}`;
+      counter += 1;
+    }
+
+    album.slug = slug;
+    await saveAlbums(albums);
+
+    res.json({ ok: true, album });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/admin/albums/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const deleteImages =
+      req.query.deleteImages === "1" || req.query.deleteImages === "true";
+
+    const albums = await readAlbums();
+    const albumIndex = albums.findIndex((entry) => entry.id === id);
+
+    if (albumIndex === -1) {
+      res.status(404).json({ ok: false, message: "Not found" });
+      return;
+    }
+
+    albums.splice(albumIndex, 1);
+    await saveAlbums(albums);
+
+    const items = await readMetadata();
+    const affected = items.filter(
+      (item) => Array.isArray(item.albums) && item.albums.includes(id)
+    );
+
+    if (deleteImages) {
+      const removedIds = new Set(affected.map((item) => item.id));
+      const remaining = items.filter((item) => !removedIds.has(item.id));
+      await saveMetadata(remaining);
+
+      await Promise.allSettled(
+        affected.flatMap((item) => {
+          const originalName = path.basename(item.original || "");
+          const thumbName = path.basename(item.thumb || "");
+          const tasks = [];
+
+          if (originalName) {
+            tasks.push(fs.unlink(path.join(ORIGINAL_DIR, originalName)));
+          }
+
+          if (thumbName) {
+            tasks.push(fs.unlink(path.join(THUMB_DIR, thumbName)));
+          }
+
+          return tasks;
+        })
+      );
+    } else {
+      affected.forEach((item) => {
+        item.albums = item.albums.filter((albumId) => albumId !== id);
+      });
+      await saveMetadata(items);
+    }
+
+    res.json({ ok: true, removedImages: affected.length });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/admin", (req, res) => {
@@ -187,6 +404,12 @@ app.post("/admin/upload", requireAdmin, upload.single("photo"), async (req, res,
     const thumbName = `${id}.webp`;
     const thumbPath = path.join(THUMB_DIR, thumbName);
 
+    const albums = await readAlbums();
+    const validAlbumIds = new Set(albums.map((album) => album.id));
+    const albumIds = normalizeIds(req.body.album_ids).filter((albumId) =>
+      validAlbumIds.has(albumId)
+    );
+
     try {
       const metadata = await sharp(file.path).metadata();
       await sharp(file.path)
@@ -209,7 +432,8 @@ app.post("/admin/upload", requireAdmin, upload.single("photo"), async (req, res,
         thumb: `/uploads/thumbs/${thumbName}`,
         createdAt: new Date().toISOString(),
         width: metadata.width || null,
-        height: metadata.height || null
+        height: metadata.height || null,
+        albums: albumIds
       };
 
       items.push(record);
@@ -253,6 +477,32 @@ app.delete("/admin/images/:id", requireAdmin, async (req, res, next) => {
     ]);
 
     res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch("/admin/images/:id/albums", requireAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const items = await readMetadata();
+    const index = items.findIndex((item) => item.id === id);
+
+    if (index === -1) {
+      res.status(404).json({ ok: false, message: "Not found" });
+      return;
+    }
+
+    const albums = await readAlbums();
+    const validAlbumIds = new Set(albums.map((album) => album.id));
+    const albumIds = normalizeIds(req.body.album_ids).filter((albumId) =>
+      validAlbumIds.has(albumId)
+    );
+
+    items[index].albums = albumIds;
+    await saveMetadata(items);
+
+    res.json({ ok: true, image: items[index] });
   } catch (error) {
     next(error);
   }

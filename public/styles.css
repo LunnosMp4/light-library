@@ -101,8 +101,86 @@ body {
   color: var(--muted);
 }
 
-.hidden {
+.album-nav {
+  margin: 0 0 24px;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  cursor: grab;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 5%,
+    black 95%,
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 5%,
+    black 95%,
+    transparent
+  );
+}
+
+.album-nav::-webkit-scrollbar {
   display: none;
+}
+
+.album-nav.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.album-nav-list {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 32px;
+  margin: 0;
+  padding: 0 8px;
+  list-style: none;
+  font-family: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+}
+
+.album-link {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font: inherit;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  text-decoration: underline transparent;
+  text-underline-offset: 6px;
+  transition: color 0.25s ease, text-decoration-color 0.25s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.album-link:hover {
+  color: var(--ink);
+  text-decoration-color: var(--ink);
+}
+
+.album-link.active {
+  color: var(--ink);
+  text-decoration-color: var(--ink);
+}
+
+.masonry-gallery {
+  transition: opacity 0.35s ease;
+}
+
+.masonry-gallery.is-fading {
+  opacity: 0;
+}
+
+.hidden {
+  display: none !important;
 }
 
 .lightbox {
@@ -139,82 +217,7 @@ body {
   cursor: pointer;
 }
 
-.admin-body {
-  background: var(--bg);
-}
-
-.admin-shell {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  padding: 32px 20px 48px;
-  position: relative;
-  z-index: 2;
-}
-
-.panel {
-  width: min(520px, 100%);
-  background: var(--card);
-  border-radius: 18px;
-  padding: 28px;
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow);
-}
-
-.admin-gallery {
-  display: grid;
-  gap: 10px;
-}
-
-.admin-card {
-  display: grid;
-  grid-template-columns: 72px 1fr auto;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: #fff;
-}
-
-.admin-thumb {
-  width: 72px;
-  height: 72px;
-  object-fit: cover;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-}
-
-.admin-meta {
-  font-size: 0.85rem;
-  color: var(--muted);
-  word-break: break-word;
-}
-
-.danger {
-  color: #b00020;
-  border-color: rgba(176, 0, 32, 0.2);
-}
-
-.admin-card .ghost {
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.admin-card:hover .ghost {
-  opacity: 1;
-}
-
-.panel-title {
-  font-size: 0.75rem;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 18px;
-}
+/* ============ Shared form utilities ============ */
 
 .stack {
   display: grid;
@@ -235,6 +238,8 @@ input[type="file"] {
   border-radius: 10px;
   border: 1px solid var(--line);
   font: inherit;
+  color: var(--ink);
+  background: #fff;
 }
 
 .primary,
@@ -294,6 +299,413 @@ input[type="file"] {
   transition: width 0.2s ease;
 }
 
+.muted {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ============ Admin layout ============ */
+
+.admin-body {
+  background: var(--bg);
+}
+
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  position: relative;
+  z-index: 2;
+}
+
+.panel {
+  width: min(420px, 100%);
+  background: var(--card);
+  border-radius: 18px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.panel-title {
+  font-size: 0.75rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+
+.dashboard {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 24px 20px;
+  border-right: 1px solid var(--line);
+  background: #fff;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.brand {
+  font-weight: 600;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+}
+
+.nav {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-item {
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.nav-item:hover {
+  color: var(--ink);
+  background: rgba(17, 17, 17, 0.04);
+}
+
+.nav-item.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.sidebar-section {
+  display: grid;
+  gap: 10px;
+}
+
+.sidebar-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.album-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.album-form input {
+  min-width: 0;
+}
+
+.album-list {
+  display: grid;
+  gap: 4px;
+}
+
+.album-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.album-item:hover {
+  background: rgba(17, 17, 17, 0.04);
+}
+
+.album-item.active {
+  border-color: var(--line);
+  background: #fff;
+  font-weight: 500;
+}
+
+.album-count {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.album-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.album-actions {
+  display: none;
+  gap: 4px;
+}
+
+.album-item:hover .album-actions,
+.album-item:focus-within .album-actions {
+  display: flex;
+}
+
+.album-action {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.album-action:hover {
+  color: var(--ink);
+}
+
+.album-action.danger:hover {
+  color: #b00020;
+  border-color: rgba(176, 0, 32, 0.3);
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.main {
+  padding: 32px 36px 64px;
+  min-width: 0;
+}
+
+.view {
+  display: none;
+  max-width: 1200px;
+}
+
+.view.active {
+  display: block;
+}
+
+.view h1 {
+  margin: 0 0 22px;
+  font-size: 1.6rem;
+}
+
+/* ============ Album checkboxes ============ */
+
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.album-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--ink);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.album-check:hover {
+  border-color: rgba(17, 17, 17, 0.3);
+}
+
+.album-check input {
+  accent-color: var(--accent);
+}
+
+.album-check:has(input:checked) {
+  border-color: var(--accent);
+  background: rgba(17, 17, 17, 0.04);
+}
+
+/* ============ Library grid ============ */
+
+.admin-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.admin-card {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+}
+
+.admin-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.admin-card-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8px;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.45),
+    rgba(0, 0, 0, 0) 40%,
+    rgba(0, 0, 0, 0) 55%,
+    rgba(0, 0, 0, 0.55)
+  );
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.admin-card:hover .admin-card-overlay {
+  opacity: 1;
+}
+
+.admin-card-delete {
+  align-self: flex-end;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  color: #b00020;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.admin-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  font-size: 0.72rem;
+}
+
+.chip-none {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.72rem;
+}
+
+/* ============ Edit modal ============ */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(18, 16, 10, 0.6);
+}
+
+.modal-panel {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 18px;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.modal-head img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+
+.modal-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.modal-heading h2 {
+  margin: 0 0 2px;
+  font-size: 1.15rem;
+}
+
+.modal-heading .muted {
+  word-break: break-word;
+}
+
+.modal-close {
+  border: 1px solid var(--line);
+  background: transparent;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* ============ Responsive ============ */
+
 @media (min-width: 600px) {
   .masonry-gallery {
     column-count: 2;
@@ -321,5 +733,16 @@ input[type="file"] {
 @media (max-width: 720px) {
   .gallery {
     padding: 0 18px 40px;
+  }
+
+  .dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
   }
 }
