@@ -6,12 +6,12 @@ services:
     ports:
       - "5500:5500"
     environment:
-      PORT: 5500
-      ADMIN_USER: admin
-      ADMIN_PASS: change-me
-      SESSION_SECRET: change-me-now
-      THUMB_SIZE: 1600
-      THUMB_QUALITY: 85
+      PORT: ${PORT}
+      ADMIN_USER: ${ADMIN_USER}
+      ADMIN_PASS: ${ADMIN_PASS}
+      SESSION_SECRET: ${SESSION_SECRET}
+      THUMB_SIZE: ${THUMB_SIZE}
+      THUMB_QUALITY: ${THUMB_QUALITY}
     volumes:
       - ./uploads:/app/uploads
       - ./data:/app/data
