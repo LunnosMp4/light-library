@@ -138,6 +138,15 @@ function normalizeIds(raw) {
   return [String(raw)].filter(Boolean);
 }
 
+function toIsoDate(value) {
+  if (value == null) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 function toShutterFraction(seconds) {
   if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) {
     return null;
@@ -158,10 +167,12 @@ async function extractExif(filePath) {
       "FNumber",
       "ExposureTime",
       "ISO",
-      "FocalLength"
+      "FocalLength",
+      "DateTimeOriginal",
+      "CreateDate"
     ]);
     if (!data) {
-      return null;
+      return { exif: null, dateTaken: null };
     }
 
     const exif = {};
@@ -185,9 +196,14 @@ async function extractExif(filePath) {
       exif.focalLength = Math.round(data.FocalLength);
     }
 
-    return Object.keys(exif).length ? exif : null;
+    const dateTaken = toIsoDate(data.DateTimeOriginal || data.CreateDate);
+
+    return {
+      exif: Object.keys(exif).length ? exif : null,
+      dateTaken
+    };
   } catch (error) {
-    return null;
+    return { exif: null, dateTaken: null };
   }
 }
 
@@ -241,12 +257,20 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+function imageSortTime(image) {
+  const taken = toIsoDate(image.dateTaken);
+  if (taken) {
+    return new Date(taken).getTime();
+  }
+
+  const fallback = toIsoDate(image.upload_date || image.createdAt);
+  return fallback ? new Date(fallback).getTime() : 0;
+}
+
 app.get("/images", async (req, res) => {
   const { album } = req.query;
   let images = await readMetadata();
-  images.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  images.sort((a, b) => imageSortTime(b) - imageSortTime(a));
 
   if (album) {
     const albums = await readAlbums();
@@ -491,7 +515,19 @@ app.post("/admin/upload", requireAdmin, upload.single("photo"), async (req, res,
 
     try {
       const metadata = await sharp(file.path).metadata();
-      const exif = await extractExif(file.path);
+      const { exif, dateTaken } = await extractExif(file.path);
+
+      const createdAt = new Date().toISOString();
+      let resolvedDateTaken = dateTaken;
+      if (!resolvedDateTaken) {
+        try {
+          const stat = await fs.stat(file.path);
+          resolvedDateTaken = toIsoDate(stat.birthtime) || createdAt;
+        } catch (statError) {
+          resolvedDateTaken = createdAt;
+        }
+      }
+
       await sharp(file.path)
         .rotate()
         .resize({
@@ -510,7 +546,8 @@ app.post("/admin/upload", requireAdmin, upload.single("photo"), async (req, res,
         filename: originalName,
         original: `/uploads/original/${originalName}`,
         thumb: `/uploads/thumbs/${thumbName}`,
-        createdAt: new Date().toISOString(),
+        createdAt,
+        dateTaken: resolvedDateTaken,
         width: metadata.width || null,
         height: metadata.height || null,
         albums: albumIds,

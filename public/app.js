@@ -9,6 +9,8 @@ const albumNav = document.getElementById("album-nav");
 const albumNavList = document.getElementById("album-nav-list");
 
 let currentSlug = null;
+let currentImages = [];
+let renderedColumns = 0;
 let lightboxToken = 0;
 
 let isDragging = false;
@@ -167,37 +169,71 @@ function buildImageItem(image) {
   return item;
 }
 
+function gridGap() {
+  const gap = parseFloat(getComputedStyle(grid).getPropertyValue("--gap"));
+  return Number.isFinite(gap) ? gap : 16;
+}
+
+function imageRatio(image) {
+  const width = Number(image.width) || 0;
+  const height = Number(image.height) || 0;
+  if (width > 0 && height > 0) {
+    return width / height;
+  }
+  return 1;
+}
+
 function renderImages(images) {
+  currentImages = Array.isArray(images) ? images : [];
+
   grid.innerHTML = "";
 
-  if (!Array.isArray(images) || images.length === 0) {
+  if (currentImages.length === 0) {
     empty.classList.remove("hidden");
+    renderedColumns = 0;
     return;
   }
 
   empty.classList.add("hidden");
 
-  const fragment = document.createDocumentFragment();
-  images.forEach((image) => {
-    fragment.appendChild(buildImageItem(image));
-  });
-  grid.appendChild(fragment);
+  const columns = Math.min(responsiveColumnCount(), currentImages.length);
+  renderedColumns = columns;
 
-  applyColumnBalance(images.length);
+  const gap = gridGap();
+  const availableWidth = grid.clientWidth || 0;
+  const columnWidth =
+    columns > 0 && availableWidth > 0
+      ? (availableWidth - (columns - 1) * gap) / columns
+      : 0;
+
+  const columnEls = [];
+  const heights = new Array(columns).fill(0);
+
+  for (let i = 0; i < columns; i += 1) {
+    const column = document.createElement("div");
+    column.className = "masonry-column";
+    grid.appendChild(column);
+    columnEls.push(column);
+  }
+
+  currentImages.forEach((image, index) => {
+    const item = buildImageItem(image);
+    item.dataset.order = String(index);
+
+    let shortest = 0;
+    for (let i = 1; i < columns; i += 1) {
+      if (heights[i] < heights[shortest]) {
+        shortest = i;
+      }
+    }
+
+    columnEls[shortest].appendChild(item);
+    heights[shortest] += columnWidth / imageRatio(image) + gap;
+  });
 }
 
 function responsiveColumnCount() {
   return window.matchMedia("(max-width: 768px)").matches ? 2 : 4;
-}
-
-function applyColumnBalance(count) {
-  const columns = responsiveColumnCount();
-
-  if (count > 0 && count < columns) {
-    grid.style.columnCount = String(count);
-  } else {
-    grid.style.columnCount = "";
-  }
 }
 
 async function fetchImages(slug) {
@@ -291,6 +327,10 @@ function enterItems(items) {
   if (!items.length) {
     return;
   }
+
+  items = Array.from(items).sort(
+    (a, b) => Number(a.dataset.order || 0) - Number(b.dataset.order || 0)
+  );
 
   items.forEach((item, index) => {
     item.style.setProperty(
@@ -419,7 +459,10 @@ albumNav.addEventListener(
 );
 
 window.addEventListener("resize", () => {
-  applyColumnBalance(grid.querySelectorAll(".masonry-item").length);
+  const columns = responsiveColumnCount();
+  if (renderedColumns > 0 && columns !== renderedColumns) {
+    renderImages(currentImages);
+  }
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
